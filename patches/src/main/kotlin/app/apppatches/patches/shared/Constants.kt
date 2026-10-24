@@ -19,4 +19,18 @@ object Constants {
             )
         )
     )
+
+    // HTTP Sniffer 2.5.2-ad_mob (version code 170), distributed as an XAPK.
+    val HTTPMOCK_COMPATIBILITY = Compatibility(
+        name = "HTTP Sniffer",
+        packageName = "com.anetcapture.mock",
+        apkFileType = ApkFileType.XAPK,
+        appIconColor = 0x2196F3,
+        targets = listOf(
+            AppTarget(
+                version = "2.5.2-ad_mob",
+                versionCode = 170
+            )
+        )
+    )
 }
