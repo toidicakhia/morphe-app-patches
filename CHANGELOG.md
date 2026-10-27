@@ -1,3 +1,9 @@
+## [1.2.0-dev.1](https://github.com/toidicakhia/morphe-app-patches/compare/v1.1.0...v1.2.0-dev.1) (2026-10-27)
+
+### ✨ New Features
+
+* add EZVIZ ad removal and SSL unpinning patches ([91d3d08](https://github.com/toidicakhia/morphe-app-patches/commit/91d3d082bd91b24bc18ae8306f132d50edc8a0ed))
+
 ## [1.1.0](https://github.com/toidicakhia/morphe-app-patches/compare/v1.0.0...v1.1.0) (2026-10-24)
 
 ### ✨ New Features
