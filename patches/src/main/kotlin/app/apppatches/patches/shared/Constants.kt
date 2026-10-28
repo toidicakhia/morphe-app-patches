@@ -48,6 +48,24 @@ object Constants {
         )
     )
 
+    // TeraBox 4.27.5 (version code 702), distributed as an XAPK.
+    val TERABOX_COMPATIBILITY = Compatibility(
+        name = "TeraBox",
+        packageName = "com.dubox.drive",
+        apkFileType = ApkFileType.XAPK,
+        appIconColor = 0x226DF6,
+        signatures = setOf(
+            "b75fd2b70084d7e0813b8f74dd74b62ab79b2aa0ce1372331a1841bd88eed993"
+        ),
+        targets = listOf(
+            AppTarget(
+                version = "4.27.5",
+                versionCode = 702,
+                minSdk = 23
+            )
+        )
+    )
+
     // 1.1.1.1 6.38.11 (version code 5703), distributed as an APKM.
     val WARP_COMPATIBILITY = Compatibility(
         name = "1.1.1.1",
