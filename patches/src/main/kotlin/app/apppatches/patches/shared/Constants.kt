@@ -47,4 +47,18 @@ object Constants {
             )
         )
     )
+
+    // 1.1.1.1 6.38.11 (version code 5703), distributed as an APKM.
+    val WARP_COMPATIBILITY = Compatibility(
+        name = "1.1.1.1",
+        packageName = "com.cloudflare.onedotonedotonedotone",
+        apkFileType = ApkFileType.APKM,
+        appIconColor = 0xF48120,
+        targets = listOf(
+            AppTarget(
+                version = "6.38.11",
+                versionCode = 5703
+            )
+        )
+    )
 }
