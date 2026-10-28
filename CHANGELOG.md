@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/toidicakhia/morphe-app-patches/compare/v1.4.0...v1.4.1) (2026-10-28)
+
+### 🐛 Bug Fixes
+
+* repair TeraBox Google login and keep Benefits ads ([aa7223e](https://github.com/toidicakhia/morphe-app-patches/commit/aa7223ee96a667561d707ac897739b19a06f73e3))
+
 ## [1.4.0](https://github.com/toidicakhia/morphe-app-patches/compare/v1.3.0...v1.4.0) (2026-10-28)
 
 ### 🐛 Bug Fixes
