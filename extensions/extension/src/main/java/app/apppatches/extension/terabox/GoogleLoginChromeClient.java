@@ -8,13 +8,10 @@ import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Message;
-import android.view.View;
-import android.view.WindowInsetsController;
 import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -22,10 +19,14 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import org.json.JSONObject;
-
-import app.apppatches.extension.shared.NightMode;
 
 @SuppressWarnings("unused")
 public class GoogleLoginChromeClient extends WebChromeClient {
@@ -35,6 +36,10 @@ public class GoogleLoginChromeClient extends WebChromeClient {
     private static final String RELAY_SCHEME = "storagerelay:";
 
     private static final String GOOGLE_ACCOUNTS_HOST = "accounts.google.com";
+
+    private static final String USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
+                    + "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
     private static final String OPENER_RELAY_SCRIPT = """
             (function(){try{if(window.__tbShim)return;window.__tbShim=1;\
@@ -47,31 +52,8 @@ public class GoogleLoginChromeClient extends WebChromeClient {
 
     private static final String READ_CREDENTIAL_SCRIPT = """
             (function(){var c=window.__tbCaptured||'';\
-            if(!c){var m=document.documentElement.outerHTML.match(/eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]+/);\
+            if(!c&&document.documentElement){var m=document.documentElement.outerHTML.match(/eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]+/);\
             if(m)c=m[0];}return c;})()\
-            """;
-
-    private static final int DARK_BACKGROUND = Color.BLACK;
-
-    private static final String DARK_THEME_SCRIPT = """
-            (function(){var r=document.documentElement;if(!r||r.__tbDark)return;r.__tbDark=1;\
-            var st=document.createElement('style');st.textContent='[data-theme=DARK] .components-login-center-third-party-button{\
-            background:transparent!important;border:1px solid rgba(255,255,255,.9)!important}\
-            [data-theme=DARK] .other-login-icon .components-login-center-icon-button{\
-            border-color:rgba(255,255,255,.5)!important}\
-            [data-theme=DARK] .other-login-icon img{filter:brightness(0) invert(.8)!important}';\
-            (document.head||r).appendChild(st);\
-            function pin(){if(r.getAttribute('data-theme')!=='DARK')r.setAttribute('data-theme','DARK')}\
-            function sum(c){var m=(c||'').match(/[\\d.]+/g);return m&&m.length>2?(+m[0])+(+m[1])+(+m[2]):-1}\
-            function alpha(c){var m=(c||'').match(/[\\d.]+/g);return m&&m.length>3?+m[3]:1}\
-            function lightBehind(e){for(;e&&e.nodeType===1;e=e.parentElement){var b=getComputedStyle(e).backgroundColor;\
-            if(alpha(b)>0.5&&sum(b)>=0)return sum(b)>600;}return false}\
-            function hasText(e){for(var n=e.firstChild;n;n=n.nextSibling)if(n.nodeType===3&&n.textContent.trim())return true;return false}\
-            function lighten(){if(!document.body)return;var a=document.body.querySelectorAll('*');\
-            for(var i=0;i<a.length;i++){var e=a[i];if(!hasText(e))continue;var c=sum(getComputedStyle(e).color);\
-            if(c>=0&&c<300&&!lightBehind(e))e.style.setProperty('color','rgba(255,255,255,.9)','important');}}\
-            var q=0;function run(){pin();if(q)return;q=1;requestAnimationFrame(function(){q=0;lighten()})}\
-            run();new MutationObserver(run).observe(r,{attributes:true,childList:true,subtree:true,attributeFilter:['data-theme']});})()\
             """;
 
     private static final String RESET_BUTTON_SCRIPT = "window.__tbReset&&window.__tbReset()";
@@ -114,7 +96,7 @@ public class GoogleLoginChromeClient extends WebChromeClient {
             try{var g=window.google&&window.google.accounts&&window.google.accounts.id;\
             if(g&&g.cancel)g.cancel();\
             var h=document.querySelector('.hidden-google-btn');\
-            if(g&&h&&window.__tbCb){var d=h.firstElementChild||h;d.innerHTML='';\
+            if(g&&h){var d=h.firstElementChild||h;d.innerHTML='';\
             g.renderButton(d,{type:'standard',theme:'outline',size:'large',\
             width:Math.round(h.getBoundingClientRect().width)||340,text:'continue_with'});\
             }}catch(e){}};\
@@ -124,7 +106,7 @@ public class GoogleLoginChromeClient extends WebChromeClient {
             g.initialize=function(c){if(c&&c.callback)window.__tbCb=c.callback;return o2.apply(this,arguments)};}\
             var h=document.querySelector('.hidden-google-btn');\
             if(h){var d2=h.firstElementChild||h;if(!d2.id)d2.id='google_login_button';\
-            if(g&&window.__tbCb&&!d2.__tb){d2.__tb=1;try{d2.innerHTML='';\
+            if(g&&!d2.__tb){d2.__tb=1;try{d2.innerHTML='';\
             g.renderButton(d2,{type:'standard',theme:'outline',size:'large',\
             width:Math.round(h.getBoundingClientRect().width)||340,text:'continue_with'});\
             }catch(e){d2.__tb=0;}}\
@@ -147,10 +129,7 @@ public class GoogleLoginChromeClient extends WebChromeClient {
         settings.setUserAgentString(appUserAgent + " " + WEBKIT_TOKEN);
     }
 
-    @Override
-    public void onProgressChanged(WebView view, int newProgress) {
-        super.onProgressChanged(view, newProgress);
-
+    public static void injectLoginScript(WebView view, int newProgress) {
         if (newProgress < 10) {
             return;
         }
@@ -161,44 +140,10 @@ public class GoogleLoginChromeClient extends WebChromeClient {
         }
 
         view.evaluateJavascript(LOGIN_PAGE_SCRIPT, null);
-        if (NightMode.isActive(view.getContext())) {
-            applyDarkTheme(view);
-        }
     }
 
-    private static void applyDarkTheme(WebView view) {
-        view.setBackgroundColor(DARK_BACKGROUND);
-        view.evaluateJavascript(DARK_THEME_SCRIPT, null);
-
-        Activity activity = activityOf(view.getContext());
-        if (activity == null) {
-            return;
-        }
-
-        int backButtonId = activity.getResources().getIdentifier("left_button", "id", activity.getPackageName());
-        View backButton = (backButtonId != 0) ? activity.findViewById(backButtonId) : null;
-        if (backButton instanceof ImageView) {
-            ((ImageView) backButton).setColorFilter(Color.WHITE);
-        }
-
-        useLightStatusBarIcons(activity);
-    }
-
-    @SuppressWarnings("deprecation")
-    private static void useLightStatusBarIcons(Activity activity) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            WindowInsetsController controller = activity.getWindow().getInsetsController();
-            if (controller != null) {
-                controller.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
-            }
-            return;
-        }
-        View decor = activity.getWindow().getDecorView();
-        decor.setSystemUiVisibility(decor.getSystemUiVisibility() & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-    }
-
-    @Override
-    public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+    public static boolean openPopup(
+            WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
         return openPopup(view, resultMsg);
     }
 
@@ -217,17 +162,8 @@ public class GoogleLoginChromeClient extends WebChromeClient {
         settings.setUserAgentString(opener.getSettings().getUserAgentString());
         CookieManager.getInstance().setAcceptThirdPartyCookies(popup, true);
 
-        boolean night = NightMode.isActive(activity);
-        if (night) {
-            popup.setBackgroundColor(DARK_BACKGROUND);
-        }
-
-        Dialog dialog = new Dialog(activity, (night) ? android.R.style.Theme_DeviceDefault_NoActionBar
-                : android.R.style.Theme_DeviceDefault_Light_NoActionBar);
+        Dialog dialog = new Dialog(activity, android.R.style.Theme_DeviceDefault_Light_NoActionBar);
         FrameLayout container = new FrameLayout(activity);
-        if (night) {
-            container.setBackgroundColor(DARK_BACKGROUND);
-        }
         container.setOnApplyWindowInsetsListener((v, insets) -> {
             v.setPadding(0, insets.getSystemWindowInsetTop(), 0, insets.getSystemWindowInsetBottom());
             return insets;
@@ -247,6 +183,99 @@ public class GoogleLoginChromeClient extends WebChromeClient {
         transport.setWebView(popup);
         resultMsg.sendToTarget();
         return true;
+    }
+
+    private static boolean completeLogin(Activity activity, String credential) {
+        if (activity == null || credential == null || credential.length() == 0) {
+            return false;
+        }
+
+        try {
+            String token = URLEncoder.encode(credential, StandardCharsets.UTF_8.name())
+                    .replace("+", "%20");
+            String url = "https://www.terabox.com/passport/ssologin"
+                    + "?lang=en&type=3&client=web&clienttype=0&support_unify=1"
+                    + "&pass_version=1.0&clientfrom=web"
+                    + "&first_referer=https%3A%2F%2Fwww.terabox.com%2F"
+                    + "&access_token=" + token;
+            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(20000);
+            connection.setRequestProperty("User-Agent", USER_AGENT);
+            connection.setRequestProperty("Referer", "https://www.terabox.com/wap/hylogin/login");
+            connection.setRequestProperty("Origin", "https://www.terabox.com");
+            connection.setRequestProperty("Accept", "*/*");
+
+            int status = connection.getResponseCode();
+            InputStream stream = (status >= 400)
+                    ? connection.getErrorStream()
+                    : connection.getInputStream();
+            String body = readAll(stream);
+            connection.disconnect();
+
+            int start = body.indexOf('{');
+            int end = body.lastIndexOf('}');
+            if (start < 0 || end <= start) {
+                return false;
+            }
+
+            JSONObject response = new JSONObject(body.substring(start, end + 1));
+            if (response.optInt("code", -1) != 0) {
+                return false;
+            }
+
+            JSONObject data = response.optJSONObject("data");
+            if (data == null) {
+                return false;
+            }
+
+            String ndus = data.optString("ndus", "");
+            if (ndus.length() == 0) {
+                return false;
+            }
+
+            JSONObject params = new JSONObject();
+            params.put("state", 1);
+            params.put("ndus", ndus);
+            params.put("uid", data.optString("userid", ""));
+            params.put("displayName", data.optString("displayName", ""));
+            params.put("headUrl", data.optString("headUrl", ""));
+            params.put("region_domain_prefix", data.optString("region_domain_prefix", "www"));
+            params.put("cur_country", data.optString("cur_country", ""));
+            params.put("reg_country", data.optString("reg_country", ""));
+            params.put("reg_time", data.optLong("reg_time", 0));
+
+            String deepLink = "dubox://user/tbsend/sendLoginResults?params="
+                    + URLEncoder.encode(params.toString(), StandardCharsets.UTF_8.name())
+                    .replace("+", "%20");
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(deepLink));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity.runOnUiThread(() -> activity.startActivity(intent));
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static String readAll(InputStream stream) {
+        if (stream == null) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+            char[] buffer = new char[4096];
+            int read;
+            while ((read = reader.read(buffer)) >= 0) {
+                builder.append(buffer, 0, read);
+                if (builder.length() > 1048576) {
+                    break;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return builder.toString();
     }
 
     private static Activity activityOf(Context context) {
@@ -327,7 +356,24 @@ public class GoogleLoginChromeClient extends WebChromeClient {
             }
 
             this.opener.evaluateJavascript(
-                    "window.__tbDeliver&&window.__tbDeliver(" + JSONObject.quote(credential) + ")", null);
+                    "(function(){return !!(window.__tbCb&&window.__tbDeliver)})()",
+                    value -> {
+                        if ("true".equals(value)) {
+                            this.opener.evaluateJavascript(
+                                    "window.__tbDeliver(" + JSONObject.quote(credential) + ")",
+                                    null);
+                            return;
+                        }
+
+                        Activity activity = activityOf(this.opener.getContext());
+                        new Thread(() -> {
+                            if (!completeLogin(activity, credential)) {
+                                this.opener.post(() -> this.opener.evaluateJavascript(
+                                        "window.__tbDeliver&&window.__tbDeliver("
+                                                + JSONObject.quote(credential) + ")", null));
+                            }
+                        }, "TeraBoxGoogleLogin").start();
+                    });
         }
 
         private boolean interceptRelayUrl(String url) {

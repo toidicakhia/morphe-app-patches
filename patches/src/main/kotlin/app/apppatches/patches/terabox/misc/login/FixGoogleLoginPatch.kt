@@ -8,45 +8,30 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.bytecodePatch
-import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.util.getFreeRegisterProvider
 import app.morphe.patcher.util.getReference
 import app.morphe.patcher.util.matchSingle
 import app.morphe.patcher.util.returnEarly
 import app.apppatches.patches.shared.Constants
+import app.apppatches.patches.shared.misc.smali.addMethod
 import app.apppatches.patches.terabox.misc.fix.signature.spoofSignaturePatch
-import app.morphe.util.findElementByAttributeValueOrThrow
 import app.morphe.util.findInstructionIndicesReversed
+import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 private const val EXTENSION_CLASS = "Lapp/apppatches/extension/terabox/GoogleLoginChromeClient;"
 
-private const val LOADING_INDICATOR_SIZE = "64.0dp"
-
-private val loginLoadingIndicatorPatch = resourcePatch {
-    execute {
-        document("res/layout/activity_account_webview.xml").use { document ->
-            document.getElementsByTagName("com.dubox.drive.ui.widget.DegradedPerformanceLottieView")
-                .findElementByAttributeValueOrThrow("android:id", "@id/image_loading")
-                .apply {
-                    setAttribute("android:layout_width", LOADING_INDICATOR_SIZE)
-                    setAttribute("android:layout_height", LOADING_INDICATOR_SIZE)
-                    removeAttribute("android:paddingTop")
-                    removeAttribute("android:paddingBottom")
-                }
-        }
-    }
-}
-
 @Suppress("unused")
 val fixGoogleLoginPatch = bytecodePatch(
     name = "Fix Google login",
-    description = "Restores signing in with a Google account.",
+    description = "Makes Sign in with Google work in the patched app, where it would " +
+        "otherwise fail. Works as soon as you patch it in, with no switch.",
+    default = true,
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)
-    dependsOn(loginLoadingIndicatorPatch, spoofSignaturePatch)
+    dependsOn(spoofSignaturePatch)
     extendWith("extensions/extension.mpe")
 
     execute {
@@ -89,6 +74,33 @@ val fixGoogleLoginPatch = bytecodePatch(
             }
         }
 
-        WebChromeClientFingerprint.matchSingle().classDef.setSuperClass(EXTENSION_CLASS)
+        WebChromeClientFingerprint.matchSingle().apply {
+            method.addInstructions(
+                0,
+                """
+                    invoke-static { p1, p2 }, $EXTENSION_CLASS->injectLoginScript(
+                        Landroid/webkit/WebView;I)V
+                """,
+            )
+
+            classDef.addMethod(
+                "onCreateWindow",
+                listOf(
+                    "Landroid/webkit/WebView;",
+                    "Z",
+                    "Z",
+                    "Landroid/os/Message;",
+                ),
+                "Z",
+                AccessFlags.PUBLIC.value,
+                5,
+                """
+                    invoke-static { p1, p2, p3, p4 }, $EXTENSION_CLASS->openPopup(
+                        Landroid/webkit/WebView;ZZLandroid/os/Message;)Z
+                    move-result p1
+                    return p1
+                """,
+            )
+        }
     }
 }

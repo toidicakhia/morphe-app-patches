@@ -25,3 +25,27 @@ internal object AdSdkInitFingerprint : Fingerprint(
     parameters = listOf("Landroid/content/Context;"),
     strings = listOf("key_ad_init_count"),
 )
+
+internal object BenefitsResumeFingerprint : Fingerprint(
+    definingClass = "Lcom/dubox/drive/business/widget/webview/CommonWebViewActivity;",
+    name = "onResume",
+    accessFlags = listOf(AccessFlags.PROTECTED),
+    returnType = "V",
+    parameters = emptyList(),
+)
+
+internal object BenefitsDestroyFingerprint : Fingerprint(
+    definingClass = "Lcom/dubox/drive/business/widget/webview/CommonWebViewActivity;",
+    name = "onDestroy",
+    accessFlags = listOf(AccessFlags.PROTECTED),
+    returnType = "V",
+    parameters = emptyList(),
+)
+
+internal object ToggleAdsFingerprint : Fingerprint(
+    definingClass = "Lcom/dubox/drive/ads/AdManager;",
+    name = "t9",
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("Z"),
+)

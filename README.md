@@ -53,8 +53,8 @@ Click here to add these patches to Morphe: https://morphe.software/add-source?gi
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Clone app](#clone-app) | Installs TeraBox as a separate app alongside the original, with its own account. Each copy needs a different clone number. | • Package name |
-| [Fix Google login](#fix-google-login) | Restores signing in with a Google account. |  |
-| [Hide ads](#hide-ads) | Removes feed, banner, interstitial, app-open, video player and rewarded ads. Features unlocked by watching an ad are unavailable. |  |
+| [Fix Google login](#fix-google-login) | Makes Sign in with Google work in the patched app, where it would otherwise fail. Works as soon as you patch it in, with no switch. |  |
+| [Hide ads](#hide-ads) | Blocks feed, banner, interstitial, app-open and video player ads on every page except Benefits, where rewarded ads stay available. |  |
 | [Hide consent form](#hide-consent-form) | Hides the ad consent form shown at startup. |  |
 | [Hide promotions](#hide-promotions) | Hides Premium upgrade cards and banners, prize and campaign cards, speed-up prompts, floating invites, and sale, coupon and promotional popups. |  |
 | [Hide video recommendations](#hide-video-recommendations) | Hides the recommended videos below the video player. |  |
