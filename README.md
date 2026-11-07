@@ -1,31 +1,33 @@
 # 🧩 App Patches
 
-Patches for Android apps, for use with [Morphe](https://morphe.software).
+Patches for Android apps, built for [Morphe](https://morphe.software).
 
-## ❓ About
+<a href="https://morphe.software/add-source?github=toidicakhia/morphe-app-patches">
+  <img src=".github/assets/add-to-morphe.svg" alt="Add to Morphe" height="48">
+</a>
 
-This repository is a Morphe patch project. It currently contains an **Unlock Premium**
-patch for [NetMonster](https://play.google.com/store/apps/details?id=cz.mroczis.netmonster)
-4.0.5 (version code 277).
+## ✨ What's inside
 
-The patch forces the Adapty premium flow to report an active subscription, disables the
-PairIP license check so the repacked APK can start, and shows a far-future expiry date in
-the Menu screen. A small helper is injected into `Application.onCreate()` to spoof the
-Google Maps certificate/API key: the map key is supplied at build time through
-`SHARED_MAPS_API_KEY`. When it is empty, the helper leaves the app's existing key
-untouched, and the map tiles will show an authorization failure because the patched APK is
-signed with a different certificate.
+This bundle currently supports:
 
-### How to use these patches
+| App | Version | Patches |
+|-----|---------|---------|
+| EZVIZ | 7.6.1.0824 | Remove ads, bypass SSL pinning, bypass signature check |
+| 1.1.1.1 | 6.38.11 | Disable analytics, disable SSL pinning, spoof WARP+ unlimited UI |
+| TeraBox | 4.27.5 | Hide ads while keeping rewarded ads on the Benefits page |
+| Universal Copy | 7.2.0 | Unlock Plus, remove ads/upgrade prompts and the Internet permission |
+| NetMonster | 4.0.5 | Unlock premium |
+| HTTP Sniffer | 2.5.2-ad_mob, 2.4.9-ad_mob | Unlock VIP |
 
-Click here to add these patches to Morphe: https://morphe.software/add-source?github=toidicakhia/morphe-app-patches
+Only the exact versions listed above are supported. Newer app releases usually need
+updated fingerprints before a patch can be applied.
 
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
 > **[v1.6.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.6.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;10 patches total
 <details open>
-<summary>📦 EZVIZ&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
+<summary><img src=".github/assets/apps/com.ezviz.png" alt="" height="20"> EZVIZ&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -42,7 +44,7 @@ Click here to add these patches to Morphe: https://morphe.software/add-source?gi
 </details>
 
 <details open>
-<summary>📦 1.1.1.1&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
+<summary><img src=".github/assets/apps/com.cloudflare.onedotonedotonedotone.png" alt="" height="20"> 1.1.1.1&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -59,7 +61,7 @@ Click here to add these patches to Morphe: https://morphe.software/add-source?gi
 </details>
 
 <details open>
-<summary>📦 TeraBox&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src=".github/assets/apps/com.dubox.drive.png" alt="" height="20"> TeraBox&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -74,7 +76,7 @@ Click here to add these patches to Morphe: https://morphe.software/add-source?gi
 </details>
 
 <details open>
-<summary>📦 Universal Copy&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src=".github/assets/apps/com.camel.corp.universalcopy.png" alt="" height="20"> Universal Copy&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -89,7 +91,7 @@ Click here to add these patches to Morphe: https://morphe.software/add-source?gi
 </details>
 
 <details open>
-<summary>📦 NetMonster&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src=".github/assets/apps/cz.mroczis.netmonster.png" alt="" height="20"> NetMonster&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -104,7 +106,7 @@ Click here to add these patches to Morphe: https://morphe.software/add-source?gi
 </details>
 
 <details open>
-<summary>📦 HTTP Sniffer&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<summary><img src=".github/assets/apps/com.anetcapture.mock.png" alt="" height="20"> HTTP Sniffer&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -122,49 +124,68 @@ Click here to add these patches to Morphe: https://morphe.software/add-source?gi
 
 &nbsp;
 
-## 🚀 Getting started
+## 📲 How to use
+
+1. Install [Morphe Manager](https://github.com/MorpheApp/morphe-manager) or
+   [Morphe Desktop](https://github.com/MorpheApp/morphe-desktop).
+2. Add this source using the link at the top of this page, or add the generated
+   `patches-bundle.json` URL manually.
+3. Select the app and the patches you want, then apply them.
+4. Install the patched APK. Uninstall the original app first if the signatures conflict.
+
+> **Note:** patched APKs are signed with a different key. Back up app data before
+> replacing the original app. Some patches intentionally remove permissions or
+> features, such as the Internet permission in Universal Copy.
+
+## 🛠️ Build from source
 
 ### Prerequisites
 
 - JDK 21.
-- Android SDK (`ANDROID_HOME` or `local.properties`).
-- GitHub credentials that can read the Morphe GitHub Packages registry
-  (`read:packages`). Either export `GITHUB_ACTOR` and `GITHUB_TOKEN`, or put
-  `gpr.user` and `gpr.key` in `~/.gradle/gradle.properties`.
+- Android SDK 36 (`ANDROID_HOME` or `sdk.dir` in `local.properties`).
+- GitHub credentials with `read:packages` for the Morphe GitHub Packages registry.
+  Set `GITHUB_ACTOR` / `GITHUB_TOKEN`, or add `gpr.user` / `gpr.key` to
+  `~/.gradle/gradle.properties`.
 
 ```bash
 export GITHUB_ACTOR=<your GitHub user>
 export GITHUB_TOKEN=<token with read:packages>
-export SHARED_MAPS_API_KEY=<optional Google Maps key for the patched app>
+export SHARED_MAPS_API_KEY=<optional Google Maps key for NetMonster>
 ```
 
-### Build
+### Build the patch bundle
 
 ```bash
-./gradlew :patches:generatePatchesList
 ./gradlew :patches:buildAndroid
 ```
 
 The bundle is written to `patches/build/libs/patches-*.mpp`. Apply it with
-[Morphe Desktop](https://github.com/MorpheApp/morphe-desktop) like any other patch bundle.
+Morphe Desktop, or with the Morphe CLI:
 
-### Where things live
+```bash
+java -jar morphe-desktop.jar patch \
+  -p patches/build/libs/patches-<version>.mpp \
+  -e "Patch name" \
+  app.apk
+```
 
-- `patches/src/main/kotlin/app/apppatches/patches/` — patches, grouped by app or feature.
-  `netmonster/` holds the NetMonster fingerprints and patch.
-- `patches/src/main/kotlin/app/apppatches/patches/shared/` — compatibility declarations.
-- `extensions/extension/` — Java code injected into the patched app.
+To refresh the generated patch list and README table locally:
+
+```bash
+./gradlew :patches:generatePatchesList
+python3 .github/scripts/generate_patches_readme.py \
+  toidicakhia/morphe-app-patches main patches-list.json README.md
+```
+
+## 📁 Project layout
+
+- `patches/src/main/kotlin/app/apppatches/patches/` — patch code, grouped by app.
+- `patches/src/main/kotlin/app/apppatches/patches/shared/` — compatibility declarations
+  and shared patch helpers.
+- `extensions/extension/` — Java code injected into patched apps.
+- `.github/workflows/` — CI and release automation.
 - `patches-list.json`, `patches-bundle.json`, `CHANGELOG.md` — generated by the release
-  workflow. Do not edit or commit them by hand.
-
-### Project setup checklist
-
-1. Set `group` and the `about` block in [patches/build.gradle.kts](patches/build.gradle.kts).
-2. Update the repository links in [README.md](README.md) and
-   [.github/ISSUE_TEMPLATE](.github/ISSUE_TEMPLATE).
-3. Add the app's `Compatibility` to `shared/Constants.kt`, including the exact versions you
-   tested.
-4. (Optional) Add `patches-bundle.png` for a custom icon in Morphe Manager.
+  workflow. Do not edit them by hand.
 
 ## 🧑‍💻 Development workflow
 
@@ -174,10 +195,11 @@ The bundle is written to `patches/build/libs/patches-*.mpp`. Apply it with
   - `feat: add a new feature`
   - `fix: fix a problem`
   - `chore: a change that should not appear in the user-facing changelog`
-- Releases are not created automatically. Run the
-  [release.yml](.github/workflows/release.yml) workflow manually from the Actions tab
-  (**Run workflow**); [.releaserc](.releaserc) decides the version from the commit history.
-- Run it on `dev` for a pre-release and on `main` for a stable release.
+- Releases are **not** created automatically. Run the
+  [release workflow](.github/workflows/release.yml) manually from the Actions tab
+  (**Run workflow**). [`.releaserc`](.releaserc) determines the version from the commit
+  history.
+- Run the workflow on `dev` for a pre-release and on `main` for a stable release.
 - Do not create releases or edit generated files manually.
 
 ## 🤓 Tips
@@ -186,6 +208,8 @@ The bundle is written to `patches/build/libs/patches-*.mpp`. Apply it with
   for examples of patches and fingerprints.
 - Do not force-push semantic-release commits. If a release is broken, create a new release
   instead of rewriting the old one.
+- When adding support for a new app version, verify every fingerprint against the exact
+  APK and update the compatibility target in `shared/Constants.kt`.
 
 ## 📜 License
 

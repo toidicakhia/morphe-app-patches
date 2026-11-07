@@ -13,7 +13,7 @@
           "name": "EZVIZ",
           "description": null,
           "apkFileType": "XAPK",
-          "appIconColor": "#00A0E9",
+          "appIconColor": "#FFFFFF",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
@@ -45,7 +45,7 @@
           "name": "EZVIZ",
           "description": null,
           "apkFileType": "XAPK",
-          "appIconColor": "#00A0E9",
+          "appIconColor": "#FFFFFF",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
@@ -77,7 +77,7 @@
           "name": "1.1.1.1",
           "description": null,
           "apkFileType": "APKM",
-          "appIconColor": "#F48120",
+          "appIconColor": "#F16F69",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
@@ -109,7 +109,7 @@
           "name": "1.1.1.1",
           "description": null,
           "apkFileType": "APKM",
-          "appIconColor": "#F48120",
+          "appIconColor": "#F16F69",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
@@ -175,7 +175,7 @@
           "name": "EZVIZ",
           "description": null,
           "apkFileType": "XAPK",
-          "appIconColor": "#00A0E9",
+          "appIconColor": "#FFFFFF",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
@@ -207,7 +207,7 @@
           "name": "1.1.1.1",
           "description": null,
           "apkFileType": "APKM",
-          "appIconColor": "#F48120",
+          "appIconColor": "#F16F69",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
@@ -273,7 +273,7 @@
           "name": "NetMonster",
           "description": null,
           "apkFileType": "APKM",
-          "appIconColor": "#1565C0",
+          "appIconColor": "#0A995B",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
@@ -305,7 +305,7 @@
           "name": "HTTP Sniffer",
           "description": null,
           "apkFileType": "XAPK",
-          "appIconColor": "#2196F3",
+          "appIconColor": "#673AB7",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
