@@ -180,10 +180,11 @@ The bundle is written to `patches/build/libs/patches-*.mpp`. Apply it with
   - `feat: add a new feature`
   - `fix: fix a problem`
   - `chore: a change that should not appear in the user-facing changelog`
-- `fix:` and `feat:` commits create pre-releases from `dev`. `chore:` does not create a release.
-- Merge `dev` into `main` (merge, do not squash) to create a stable release.
-- Releases are produced by [release.yml](.github/workflows/release.yml) and
-  [.releaserc](.releaserc). Do not create releases or edit generated files manually.
+- Releases are not created automatically. Run the
+  [release.yml](.github/workflows/release.yml) workflow manually from the Actions tab
+  (**Run workflow**); [.releaserc](.releaserc) decides the version from the commit history.
+- Run it on `dev` for a pre-release and on `main` for a stable release.
+- Do not create releases or edit generated files manually.
 
 ## 🤓 Tips
 
