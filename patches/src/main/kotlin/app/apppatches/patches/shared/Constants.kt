@@ -71,7 +71,7 @@ object Constants {
         )
     )
 
-    // Universal Copy 7.1.0 (version code 104), distributed as an XAPK.
+    // Universal Copy 7.2.0 (version code 106), distributed as an XAPK.
     val UNIVERSAL_COPY_COMPATIBILITY = Compatibility(
         name = "Universal Copy",
         packageName = "com.camel.corp.universalcopy",
@@ -82,9 +82,9 @@ object Constants {
         ),
         targets = listOf(
             AppTarget(
-                version = "7.1.0",
-                versionCode = 104,
-                minSdk = 29
+                version = "7.2.0",
+                versionCode = 106,
+                minSdk = 26
             )
         )
     )
