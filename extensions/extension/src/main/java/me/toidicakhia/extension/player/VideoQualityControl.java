@@ -22,8 +22,11 @@ import android.widget.TextView;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -57,7 +60,14 @@ public final class VideoQualityControl {
     private static View panel;
     private static View scrim;
     private static boolean panelOpen;
+    private static final Map<Object, PlaybackSnapshot> SNAPSHOTS =
+        Collections.synchronizedMap(new WeakHashMap<>());
+
     private static volatile int qualityIndex = 0;
+    private static volatile int appWidth;
+    private static volatile int appHeight;
+    private static volatile int appBitrate;
+    private static boolean internalChange;
     private static int areaLeft;
     private static int areaTop;
     private static int areaWidth;
@@ -76,6 +86,11 @@ public final class VideoQualityControl {
      * quality menu and limits keep working. Any other preset overrides them.
      */
     public static int[] resolve(int width, int height, int bitrate) {
+        if (!internalChange && width > 0 && height > 0) {
+            appWidth = width;
+            appHeight = height;
+            appBitrate = bitrate;
+        }
         int index = qualityIndex;
         if (index == 0) {
             return new int[]{width, height, bitrate};
@@ -252,6 +267,29 @@ public final class VideoQualityControl {
         return layout;
     }
 
+    /**
+     * Reflects the quality requested by the app itself, so "Tự động" can show
+     * what the app will actually use (for example "Tự động (720p)").
+     */
+    private static String autoLabel() {
+        int height = appHeight;
+        String suffix;
+        if (height >= 1000) {
+            suffix = "1080p";
+        } else if (height >= 700) {
+            suffix = "720p";
+        } else if (height >= 460) {
+            suffix = "480p";
+        } else if (height >= 340) {
+            suffix = "360p";
+        } else if (height > 0) {
+            suffix = height + "p";
+        } else {
+            return LABELS[0];
+        }
+        return LABELS[0] + " (" + suffix + ")";
+    }
+
     private static LinearLayout createRow(Activity activity, int index) {
         LinearLayout row = new LinearLayout(activity);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -267,7 +305,7 @@ public final class VideoQualityControl {
         row.setOnClickListener(v -> selectQuality(index));
 
         TextView label = new TextView(activity);
-        label.setText(LABELS[index]);
+        label.setText(index == 0 && qualityIndex == 0 ? autoLabel() : LABELS[index]);
         label.setTextColor(index == qualityIndex ? COLOR_ACCENT : COLOR_TEXT);
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         row.addView(label, new LinearLayout.LayoutParams(
@@ -538,6 +576,8 @@ public final class VideoQualityControl {
         attachTouchWatcher(activity);
         boolean anchored = ensureButton(activity);
 
+        syncWithPlayers();
+
         long now = SystemClock.uptimeMillis();
         boolean active = hasActivePlayer();
         if (active && !lastActive) {
@@ -594,6 +634,67 @@ public final class VideoQualityControl {
         return false;
     }
 
+    /**
+     * Watches the players for play/pause/seek/buffering changes and treats
+     * them as player interactions, so the button follows the controls the
+     * app itself shows for those actions.
+     */
+    private static void syncWithPlayers() {
+        long now = SystemClock.uptimeMillis();
+        for (Iterator<WeakReference<Object>> iterator = PLAYERS.iterator(); iterator.hasNext(); ) {
+            Object player = iterator.next().get();
+            if (player == null) {
+                iterator.remove();
+                continue;
+            }
+            try {
+                Object exoPlayer = getExoPlayer(player);
+                if (exoPlayer == null) {
+                    continue;
+                }
+                int state = getPlaybackState(exoPlayer);
+                Method playingMethod = exoPlayer.getClass().getMethod("isPlaying");
+                boolean playing = (Boolean) playingMethod.invoke(exoPlayer);
+                Method positionMethod = exoPlayer.getClass().getMethod("getCurrentPosition");
+                long position = (Long) positionMethod.invoke(exoPlayer);
+
+                PlaybackSnapshot previous = SNAPSHOTS.get(player);
+                if (previous == null) {
+                    SNAPSHOTS.put(player, new PlaybackSnapshot(state, playing, position, now));
+                    continue;
+                }
+                boolean changed = previous.playing != playing;
+                if (!changed && Math.abs(position - previous.position) > 2500) {
+                    long elapsed = now - previous.timestamp;
+                    long delta = position - previous.position;
+                    changed = Math.abs(delta - elapsed) > 2000 || delta < 0;
+                }
+                if (changed) {
+                    lastInteraction = now;
+                }
+                previous.state = state;
+                previous.playing = playing;
+                previous.position = position;
+                previous.timestamp = now;
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static final class PlaybackSnapshot {
+        int state;
+        boolean playing;
+        long position;
+        long timestamp;
+
+        PlaybackSnapshot(int state, boolean playing, long position, long timestamp) {
+            this.state = state;
+            this.playing = playing;
+            this.position = position;
+            this.timestamp = timestamp;
+        }
+    }
+
     private static boolean isPlayerActive(Object player) {
         try {
             Object exoPlayer = getExoPlayer(player);
@@ -642,10 +743,17 @@ public final class VideoQualityControl {
             Method method = player.getClass().getMethod(
                 "setTrackParameters", int.class, int.class, int.class
             );
-            if (index == 0) {
-                method.invoke(player, 0, 0, 0);
-            } else {
-                method.invoke(player, WIDTHS[index], HEIGHTS[index], 0);
+            internalChange = true;
+            try {
+                if (index == 0 && appWidth > 0 && appHeight > 0) {
+                    method.invoke(player, appWidth, appHeight, appBitrate);
+                } else if (index == 0) {
+                    method.invoke(player, 0, 0, 0);
+                } else {
+                    method.invoke(player, WIDTHS[index], HEIGHTS[index], 0);
+                }
+            } finally {
+                internalChange = false;
             }
         } catch (Throwable ignored) {
         }
