@@ -72,6 +72,10 @@ public final class VideoQualityControl {
     private static int areaTop;
     private static int areaWidth;
     private static int areaHeight;
+    private static int lastAreaLeft = -1;
+    private static int lastAreaTop = -1;
+    private static int lastAreaWidth = -1;
+    private static int lastAreaHeight = -1;
     private static long lastInteraction;
     private static boolean lastActive;
 
@@ -430,6 +434,22 @@ public final class VideoQualityControl {
             areaTop = statusBarHeight(activity) + dp(activity, 60);
             areaHeight = Math.round(contentWidth * 9f / 16f);
         }
+
+        if (player != null && lastAreaWidth > 0) {
+            boolean moved = Math.abs(areaLeft - lastAreaLeft) > dp(activity, 2)
+                || Math.abs(areaTop - lastAreaTop) > dp(activity, 2)
+                || Math.abs(areaWidth - lastAreaWidth) > dp(activity, 2)
+                || Math.abs(areaHeight - lastAreaHeight) > dp(activity, 2);
+            if (moved) {
+                // Entering/leaving fullscreen or a layout change: the app
+                // shows its controls for those transitions too.
+                lastInteraction = SystemClock.uptimeMillis();
+            }
+        }
+        lastAreaLeft = areaLeft;
+        lastAreaTop = areaTop;
+        lastAreaWidth = areaWidth;
+        lastAreaHeight = areaHeight;
 
         button.measure(
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
