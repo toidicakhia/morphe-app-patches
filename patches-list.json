@@ -263,6 +263,38 @@
       "options": []
     },
     {
+      "name": "Faster Startup",
+      "description": "Skips the Firebase Analytics connector, Crashlytics session tracking and the emoji-compat initializer that run on every launch. Crash reporting, push notifications and background jobs keep working; analytics and app-quality session data are not collected.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.devolutions.remotedesktopmanager",
+          "name": "Remote Desktop Manager",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#E8523F",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "2026.3.1.5",
+              "versionCodes": {
+                "ARM64_V8A": 500987,
+                "ARMEABI_V7A": 500987,
+                "X86_64": 500987,
+                "X86": 500987
+              },
+              "isExperimental": false,
+              "minSdk": 24,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Hide ads",
       "description": "Blocks feed, banner, interstitial, app-open and video player ads on every page except Benefits, where rewarded ads stay available.",
       "default": true,
