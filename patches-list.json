@@ -738,7 +738,7 @@
     },
     {
       "name": "Video quality control",
-      "description": "Adds an on-screen button to cycle the player's video quality. Auto follows the app's own selection; the other presets override the player's quality caps.",
+      "description": "Adds an on-screen settings menu for the player's video quality. Auto follows the app's own selection; the other presets override the player's quality caps.",
       "default": true,
       "category": null,
       "compatiblePackages": [

@@ -90,3 +90,30 @@ internal object SetTrackParametersFingerprint : Fingerprint(
     returnType = "V",
     parameters = listOf("I", "I", "I")
 )
+
+internal object BetterPlayerConstructorFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR),
+    parameters = listOf(
+        "Landroid/content/Context;",
+        "Lif1;",
+        "Lio/flutter/view/TextureRegistry\$SurfaceProducer;",
+        "Luz/shs/better_player_plus/CustomDefaultLoadControl;",
+        "Lio/flutter/plugin/common/MethodChannel\$Result;"
+    ),
+    returnType = "V",
+    custom = { _, classDef -> classDef.type == "Luz/shs/better_player_plus/BetterPlayer;" }
+)
+
+internal object BetterPlayerDisposeFingerprint : Fingerprint(
+    definingClass = "Luz/shs/better_player_plus/BetterPlayer;",
+    name = "dispose",
+    parameters = emptyList(),
+    returnType = "V"
+)
+
+internal object MainFlutterActivityOnResumeFingerprint : Fingerprint(
+    definingClass = "Lvn/vtv/vtvgo/MainFlutterActivity;",
+    name = "onResume",
+    parameters = emptyList(),
+    returnType = "V"
+)

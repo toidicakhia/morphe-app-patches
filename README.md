@@ -44,7 +44,7 @@ updated fingerprints before a patch can be applied.
 | [Remove Calendar Permissions](#remove-calendar-permissions) | Removes calendar read/write permissions. Programme reminders will no longer work. |  |
 | [Remove Video Ads](#remove-video-ads) | Removes VTVGo pre-roll, mid-roll, welcome TVC and other VAST/IMA ads by rejecting ad requests before playback starts. |  |
 | [Trust User Certificates](#trust-user-certificates) | Adds user-installed CA certificates to the network security config so native traffic can be inspected with a debugging proxy. Flutter's Dart HTTP stack keeps its own trust store. |  |
-| [Video quality control](#video-quality-control) | Adds an on-screen button to cycle the player's video quality. Auto follows the app's own selection; the other presets override the player's quality caps. |  |
+| [Video quality control](#video-quality-control) | Adds an on-screen settings menu for the player's video quality. Auto follows the app's own selection; the other presets override the player's quality caps. |  |
 
 </details>
 
