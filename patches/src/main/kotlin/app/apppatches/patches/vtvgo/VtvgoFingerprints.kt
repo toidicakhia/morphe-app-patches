@@ -83,3 +83,10 @@ internal object FirebaseCollectionToggleFingerprint : Fingerprint(
         } == true
     }
 )
+
+internal object SetTrackParametersFingerprint : Fingerprint(
+    name = "setTrackParameters",
+    definingClass = "Luz/shs/better_player_plus/BetterPlayer;",
+    returnType = "V",
+    parameters = listOf("I", "I", "I")
+)

@@ -669,6 +669,40 @@
         }
       ],
       "options": []
+    },
+    {
+      "name": "Unlock Video Quality",
+      "description": "Removes the player's video quality constraints so free-tier, battery-saver and mobile-data caps no longer block the best available resolution.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "vn.vtv.vtvgo",
+          "name": "VTVGo",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#DC0000",
+          "signatures": [
+            "651a068b47d26e1a79ba6fcdae64eab8b512bde27d1ca60e20686cf06c94f227"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "12.11.13",
+              "versionCodes": {
+                "ARM64_V8A": 260935,
+                "ARMEABI_V7A": 260935,
+                "X86_64": 260935,
+                "X86": 260935
+              },
+              "isExperimental": false,
+              "minSdk": 24,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
     }
   ]
 }
