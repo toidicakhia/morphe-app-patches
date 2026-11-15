@@ -7,7 +7,7 @@ import app.morphe.patcher.util.matchSingle
 
 @Suppress("unused")
 val vtvgoUnlockVideoQualityPatch = bytecodePatch(
-    name = "Unlock Video Quality",
+    name = "Unlock video quality",
     description = "Removes the player's video quality constraints so free-tier, battery-saver and " +
         "mobile-data caps no longer block the best available resolution.",
     default = true
