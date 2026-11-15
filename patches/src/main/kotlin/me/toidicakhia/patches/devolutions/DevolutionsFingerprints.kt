@@ -36,3 +36,16 @@ internal object XamarinTrustManagerCheckServerTrustedFingerprint : Fingerprint(
     returnType = "V",
     accessFlags = listOf(AccessFlags.PUBLIC)
 )
+
+/**
+ * The only implementation of the Play Age Signals client that the app can hand to
+ * the managed verify call. The managed side waits on the returned task, so replacing
+ * this body with a completed task removes the Play Store round trip entirely.
+ */
+internal object AgeSignalsAccessRequestFingerprint : Fingerprint(
+    definingClass = "Lcom/google/android/play/agesignals/zzb;",
+    name = "requestAgeSignalsAccess",
+    parameters = listOf("Lcom/google/android/play/agesignals/AgeSignalsAccessRequest;"),
+    returnType = "Lcom/google/android/gms/tasks/Task;",
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL)
+)

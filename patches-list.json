@@ -495,6 +495,38 @@
       "options": []
     },
     {
+      "name": "Skip Age Verification",
+      "description": "Answers the Google Play age-signals request locally instead of waiting for the Play Store. The managed startup code blocks on that answer for up to two minutes, and the call never completes on sideloaded builds or devices without Play Services. Also skips the follow-up age-range query. Not selected by default: it disables the regional age gate.",
+      "default": false,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.devolutions.remotedesktopmanager",
+          "name": "Remote Desktop Manager",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#E8523F",
+          "signatures": null,
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "2026.3.1.5",
+              "versionCodes": {
+                "ARM64_V8A": 500987,
+                "ARMEABI_V7A": 500987,
+                "X86_64": 500987,
+                "X86": 500987
+              },
+              "isExperimental": false,
+              "minSdk": 24,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Spoof WARP+ Unlimited UI",
       "description": "Forces WarpPlusState to UNLIMITED on every AccountData instance by intercepting the primary constructor before the account type field is written.",
       "default": true,
@@ -705,8 +737,8 @@
       "options": []
     },
     {
-      "name": "Unlock video quality",
-      "description": "Removes the player's video quality constraints so free-tier, battery-saver and mobile-data caps no longer block the best available resolution.",
+      "name": "Video quality control",
+      "description": "Adds an on-screen button to cycle the player's video quality. Auto follows the app's own selection; the other presets override the player's quality caps.",
       "default": true,
       "category": null,
       "compatiblePackages": [
