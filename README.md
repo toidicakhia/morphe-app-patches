@@ -219,8 +219,8 @@ python3 .github/scripts/generate_patches_readme.py \
 
 ## 📁 Project layout
 
-- `patches/src/main/kotlin/app/apppatches/patches/` — patch code, grouped by app.
-- `patches/src/main/kotlin/app/apppatches/patches/shared/` — compatibility declarations
+- `patches/src/main/kotlin/me/toidicakhia/patches/` — patch code, grouped by app.
+- `patches/src/main/kotlin/me/toidicakhia/patches/shared/` — compatibility declarations
   and shared patch helpers.
 - `extensions/extension/` — Java code injected into patched apps.
 - `.github/workflows/` — CI and release automation.
