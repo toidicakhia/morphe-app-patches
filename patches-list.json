@@ -561,6 +561,40 @@
       "options": []
     },
     {
+      "name": "Unlock Locket Gold",
+      "description": "Makes the app treat the signed-in account as a Locket Gold subscriber, enabling the Gold-only feature gates and replacing the paywall with subscription management. Client-side only: features validated by Locket's servers still need a real subscription.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.locket.Locket",
+          "name": "Locket Widget",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#FFB201",
+          "signatures": [
+            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.247.1",
+              "versionCodes": {
+                "ARM64_V8A": 632,
+                "ARMEABI_V7A": 632,
+                "X86_64": 632,
+                "X86": 632
+              },
+              "isExperimental": false,
+              "minSdk": 27,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Unlock Plus",
       "description": "Unlocks Universal Copy Plus: removes ads, upgrade prompts and the Internet permission, and bypasses the PairIP license check so the patched app starts.",
       "default": true,

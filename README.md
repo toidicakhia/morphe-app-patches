@@ -26,7 +26,7 @@ updated fingerprints before a patch can be applied.
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.7.1](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.7.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;21 patches total
+> **[v1.7.1](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.7.1)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;22 patches total
 <details open>
 <summary><img src=".github/assets/apps/vn.vtv.vtvgo.png" alt="" height="20"> VTVGo&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
@@ -112,6 +112,21 @@ updated fingerprints before a patch can be applied.
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Hide ads](#hide-ads) | Blocks feed, banner, interstitial, app-open and video player ads on every page except Benefits, where rewarded ads stay available. |  |
+
+</details>
+
+<details open>
+<summary><img src=".github/assets/apps/com.locket.Locket.png" alt="" height="20"> Locket Widget&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 1.247.1 |
+| :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Unlock Locket Gold](#unlock-locket-gold) | Makes the app treat the signed-in account as a Locket Gold subscriber, enabling the Gold-only feature gates and replacing the paywall with subscription management. Client-side only: features validated by Locket's servers still need a real subscription. |  |
 
 </details>
 

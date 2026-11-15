@@ -125,6 +125,24 @@ object Constants {
         )
     )
 
+    // Locket Widget 1.247.1 (version code 632), distributed as an XAPK/APKM
+    // with a base APK plus config.arm64_v8a, config.en and config.xxhdpi splits.
+    val LOCKET_COMPATIBILITY = Compatibility(
+        name = "Locket Widget",
+        packageName = "com.locket.Locket",
+        apkFileType = ApkFileType.XAPK,
+        appIconColor = 0xFFB201,
+        signatures = setOf(
+            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
+        ),
+        targets = listOf(
+            AppTarget(
+                version = "1.247.1",
+                versionCode = 632,
+                minSdk = 27
+            )
+        )
+    )
     // 1.1.1.1 6.38.11 (version code 5703), distributed as an APKM.
     val WARP_COMPATIBILITY = Compatibility(
         name = "1.1.1.1",
