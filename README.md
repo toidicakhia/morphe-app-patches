@@ -33,7 +33,7 @@ updated fingerprints before a patch can be applied.
 
 **🎯 Supported versions:**
 
-| 12.11.05 |
+| 12.11.13 |
 | :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
