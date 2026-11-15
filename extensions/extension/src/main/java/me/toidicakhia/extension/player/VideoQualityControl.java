@@ -3,6 +3,7 @@ package me.toidicakhia.extension.player;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,6 +15,7 @@ import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -23,6 +25,7 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +38,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * The button follows the bounds of the video surface, so it stays inside the
  * player area (also in fullscreen). Tapping it opens a small menu listing the
  * available quality presets.
+ *
+ * Visibility is driven by the exact state of the player's control bar. Flutter
+ * only exposes that state through its semantics tree, so the engine semantics
+ * are switched on from Java (no accessibility service required) and the tree
+ * is polled for the pause/play button that the player centres over the video.
  */
 public final class VideoQualityControl {
 
@@ -68,6 +76,10 @@ public final class VideoQualityControl {
     private static volatile int appHeight;
     private static volatile int appBitrate;
     private static boolean internalChange;
+    private static Object semanticsBridge;
+    private static Object flutterJni;
+    private static boolean semanticsTried;
+    private static long lastSemanticsAttempt;
     private static int areaLeft;
     private static int areaTop;
     private static int areaWidth;
@@ -107,6 +119,8 @@ public final class VideoQualityControl {
             return;
         }
         activityRef = new WeakReference<>(activity);
+        semanticsTried = false;
+        semanticsBridge = null;
         HANDLER.post(() -> {
             if (activity.isFinishing() || activity.isDestroyed()) {
                 return;
@@ -579,6 +593,165 @@ public final class VideoQualityControl {
             || view instanceof ImageView;
     }
 
+    /**
+     * Turns Flutter semantics on through the engine, so the control bar nodes
+     * are available even when no accessibility service is running.
+     */
+    private static void enableSemantics(Activity activity) {
+        if (semanticsTried) {
+            return;
+        }
+        semanticsTried = true;
+        try {
+            ViewGroup content = activity.findViewById(android.R.id.content);
+            ViewGroup flutterView = content == null ? null : findFlutterView(content);
+            if (flutterView == null) {
+                return;
+            }
+            for (Field field : flutterView.getClass().getDeclaredFields()) {
+                field.setAccessible(true);
+                Object value = field.get(flutterView);
+                if (value != null && isNamed(value.getClass(), "io.flutter.view.d")) {
+                    semanticsBridge = value;
+                    break;
+                }
+            }
+            flutterJni = findNestedFieldValue(
+                flutterView, "io.flutter.embedding.engine.FlutterJNI"
+            );
+            if (flutterJni != null) {
+                Method method = flutterJni.getClass().getMethod("setSemanticsEnabled", boolean.class);
+                method.invoke(flutterJni, true);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void reenableSemantics() {
+        long now = SystemClock.uptimeMillis();
+        if (now - lastSemanticsAttempt < 2000) {
+            return;
+        }
+        lastSemanticsAttempt = now;
+        try {
+            Method method = flutterJni.getClass().getMethod("setSemanticsEnabled", boolean.class);
+            method.invoke(flutterJni, true);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static Object findNestedFieldValue(Object target, String typeName) {
+        Class<?> type = target.getClass();
+        while (type != null) {
+            for (Field field : type.getDeclaredFields()) {
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(target);
+                    if (value == null) {
+                        continue;
+                    }
+                    if (isNamed(value.getClass(), typeName)) {
+                        return value;
+                    }
+                    Class<?> innerType = value.getClass();
+                    while (innerType != null) {
+                        for (Field inner : innerType.getDeclaredFields()) {
+                            try {
+                                inner.setAccessible(true);
+                                Object nested = inner.get(value);
+                                if (nested != null && isNamed(nested.getClass(), typeName)) {
+                                    return nested;
+                                }
+                            } catch (Throwable ignored) {
+                            }
+                        }
+                        innerType = innerType.getSuperclass();
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            type = type.getSuperclass();
+        }
+        return null;
+    }
+
+    private static boolean isNamed(Class<?> type, String name) {
+        while (type != null) {
+            if (name.equals(type.getName())) {
+                return true;
+            }
+            type = type.getSuperclass();
+        }
+        return false;
+    }
+
+    /**
+     * Reads Flutter's own semantics tree and reports whether the player is
+     * currently showing small clickable controls (pause / fullscreen).
+     */
+    private static Boolean readControlsVisible(Activity activity) {
+        if (semanticsBridge == null) {
+            return null;
+        }
+        try {
+            HashMap<?, ?> nodes = null;
+            for (Field field : semanticsBridge.getClass().getDeclaredFields()) {
+                field.setAccessible(true);
+                Object value = field.get(semanticsBridge);
+                if (value instanceof HashMap && !((HashMap<?, ?>) value).isEmpty()) {
+                    Object first = ((HashMap<?, ?>) value).values().iterator().next();
+                    if (first != null && isNamed(first.getClass(), "io.flutter.view.c")) {
+                        nodes = (HashMap<?, ?>) value;
+                        break;
+                    }
+                }
+            }
+            if (nodes == null) {
+                return null;
+            }
+            Method create = semanticsBridge.getClass().getMethod(
+                "createAccessibilityNodeInfo", int.class
+            );
+            ViewGroup content = activity.findViewById(android.R.id.content);
+            ViewGroup flutterView = content == null ? null : findFlutterView(content);
+            if (flutterView == null) {
+                return null;
+            }
+            int[] location = new int[2];
+            flutterView.getLocationOnScreen(location);
+            int left = location[0] + areaLeft;
+            int top = location[1] + areaTop;
+            int right = left + areaWidth;
+            int bottom = top + areaHeight;
+            int expectedRight = right - dp(activity, 8);
+            int expectedBottom = bottom - dp(activity, 8);
+            int minSize = dp(activity, 18);
+            int maxSize = dp(activity, 36);
+            Rect rect = new Rect();
+            for (Object key : nodes.keySet()) {
+                AccessibilityNodeInfo node = (AccessibilityNodeInfo) create.invoke(
+                    semanticsBridge, (Integer) key
+                );
+                if (node == null || !node.isClickable()) {
+                    continue;
+                }
+                node.getBoundsInScreen(rect);
+                boolean inside = rect.left >= left - 4 && rect.right <= right + 4
+                    && rect.top >= top - 4 && rect.bottom <= bottom + 4;
+                boolean corner = Math.abs(rect.right - expectedRight) <= dp(activity, 10)
+                    && Math.abs(rect.bottom - expectedBottom) <= dp(activity, 10);
+                boolean sized = rect.width() >= minSize && rect.width() <= maxSize
+                    && rect.height() >= minSize && rect.height() <= maxSize;
+                if (inside && corner && sized) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     private static void refreshVisibility() {
         Activity activity = activityRef.get();
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
@@ -594,9 +767,8 @@ public final class VideoQualityControl {
         }
 
         attachTouchWatcher(activity);
+        enableSemantics(activity);
         boolean anchored = ensureButton(activity);
-
-        syncWithPlayers();
 
         long now = SystemClock.uptimeMillis();
         boolean active = hasActivePlayer();
@@ -610,8 +782,16 @@ public final class VideoQualityControl {
             return;
         }
 
-        boolean controlsVisible = now - lastInteraction < CONTROLS_TIMEOUT_MS;
-        boolean show = panelOpen || (anchored && active && (controlsVisible || hasPausedPlayer()));
+        syncWithPlayers();
+        Boolean exactControls = readControlsVisible(activity);
+        if (exactControls == null && flutterJni != null) {
+            reenableSemantics();
+        }
+
+        boolean controlsVisible = exactControls != null
+            ? exactControls
+            : now - lastInteraction < CONTROLS_TIMEOUT_MS;
+        boolean show = panelOpen || (anchored && active && controlsVisible);
         if (button != null) {
             button.setVisibility(show ? View.VISIBLE : View.GONE);
         }
@@ -627,7 +807,8 @@ public final class VideoQualityControl {
 
     private static void scheduleRefresh() {
         HANDLER.removeCallbacks(REFRESH);
-        HANDLER.postDelayed(REFRESH, 1000);
+        boolean active = hasActivePlayer();
+        HANDLER.postDelayed(REFRESH, active ? 400 : 1000);
     }
 
     private static boolean hasActivePlayer() {
@@ -636,18 +817,6 @@ public final class VideoQualityControl {
             if (player == null) {
                 iterator.remove();
             } else if (isPlayerActive(player)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean hasPausedPlayer() {
-        for (Iterator<WeakReference<Object>> iterator = PLAYERS.iterator(); iterator.hasNext(); ) {
-            Object player = iterator.next().get();
-            if (player == null) {
-                iterator.remove();
-            } else if (isPlayerPaused(player)) {
                 return true;
             }
         }
