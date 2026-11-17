@@ -53,6 +53,7 @@ APP_ICONS = {
     "com.anetcapture.mock": ".github/assets/apps/com.anetcapture.mock.png",
     "vn.vtv.vtvgo": ".github/assets/apps/vn.vtv.vtvgo.png",
     "com.locket.Locket": ".github/assets/apps/com.locket.Locket.png",
+    "com.pioneerdj.WeDJ": ".github/assets/apps/com.pioneerdj.WeDJ.png",
 }
 
 
@@ -99,8 +100,14 @@ for patch in data["patches"]:
                 "name":    pkg_label(name, form_factor),
                 "icon":    pkg_icon(pkg, form_factor),
                 "patches": {},
-                "targets": pkg_entry.get("targets", []),
+                "targets": list(pkg_entry.get("targets", [])),
             }
+        else:
+            # The same app can declare several Compatibility entries (for
+            # example APK and APKM builds); merge their supported versions.
+            for target in pkg_entry.get("targets", []):
+                if target not in by_pkg[key]["targets"]:
+                    by_pkg[key]["targets"].append(target)
         # Deduplicate patches that appear across multiple packages
         if patch["name"] not in by_pkg[key]["patches"]:
             by_pkg[key]["patches"][patch["name"]] = patch

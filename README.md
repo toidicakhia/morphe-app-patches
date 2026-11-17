@@ -25,7 +25,7 @@ updated fingerprints before a patch can be applied.
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.7.2](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.7.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;17 patches total
+> **[v1.7.2](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.7.2)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;19 patches total
 <details open>
 <summary><img src=".github/assets/apps/vn.vtv.vtvgo.png" alt="" height="20"> VTVGo&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
@@ -78,6 +78,23 @@ updated fingerprints before a patch can be applied.
 | [Disable Analytics / Telemetry](#disable-analytics-telemetry) | Disables all Cloudflare telemetry by no-oping the analytics bundle builder and the Firebase event dispatchers. |  |
 | [Disable SSL Pinning](#disable-ssl-pinning) | Bypasses OkHttp certificate pinning on Cloudflare API calls to allow TLS traffic inspection. |  |
 | [Spoof WARP+ Unlimited UI](#spoof-warp-unlimited-ui) | Forces WarpPlusState to UNLIMITED on every AccountData instance by intercepting the primary constructor before the account type field is written. |  |
+
+</details>
+
+<details open>
+<summary><img src=".github/assets/apps/com.pioneerdj.WeDJ.png" alt="" height="20"> WeDJ&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 1.1.4.5 | 1.1.1.3 |
+| :---: | :---: |
+| Latest release; requires Android 13+. | Use on Android 9-12. |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Disable Analytics / Telemetry](#disable-analytics-telemetry) | Stops WeDJ's Mobylog tracking client from uploading playback, device-connection and startup app-check events. |  |
+| [Unlock Unlimited Playback](#unlock-unlimited-playback) | Makes WeDJ treat the "Unlock Unlimited Playback" in-app purchase as owned. The free-version limit that stops playback after loading a few tracks is removed and the purchase entry disappears from the track browser. Use WeDJ 1.1.1.3 on Android 9-12 and 1.1.4.5 on Android 13+. Client-side only: the Play Store transaction itself is not simulated. |  |
 
 </details>
 

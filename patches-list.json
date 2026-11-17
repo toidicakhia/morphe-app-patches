@@ -167,6 +167,40 @@
       "options": []
     },
     {
+      "name": "Disable Analytics / Telemetry",
+      "description": "Stops WeDJ's Mobylog tracking client from uploading playback, device-connection and startup app-check events.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.pioneerdj.WeDJ",
+          "name": "WeDJ",
+          "description": null,
+          "apkFileType": "APKM",
+          "appIconColor": "#007CFC",
+          "signatures": [
+            "f17221c501b8a3b13a6903419fe9afd62653c5898f6c80be698f9e10ade998c1"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.1.4.5",
+              "versionCodes": {
+                "ARM64_V8A": 1145,
+                "ARMEABI_V7A": 1145,
+                "X86_64": 1145,
+                "X86": 1145
+              },
+              "isExperimental": false,
+              "minSdk": 33,
+              "description": "Latest release; requires Android 13+."
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Disable SSL Pinning",
       "description": "Bypasses OkHttp certificate pinning on Cloudflare API calls to allow TLS traffic inspection.",
       "default": false,
@@ -492,6 +526,65 @@
               "isExperimental": false,
               "minSdk": null,
               "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Unlock Unlimited Playback",
+      "description": "Makes WeDJ treat the \"Unlock Unlimited Playback\" in-app purchase as owned. The free-version limit that stops playback after loading a few tracks is removed and the purchase entry disappears from the track browser. Use WeDJ 1.1.1.3 on Android 9-12 and 1.1.4.5 on Android 13+. Client-side only: the Play Store transaction itself is not simulated.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.pioneerdj.WeDJ",
+          "name": "WeDJ",
+          "description": null,
+          "apkFileType": "APKM",
+          "appIconColor": "#007CFC",
+          "signatures": [
+            "f17221c501b8a3b13a6903419fe9afd62653c5898f6c80be698f9e10ade998c1"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.1.4.5",
+              "versionCodes": {
+                "ARM64_V8A": 1145,
+                "ARMEABI_V7A": 1145,
+                "X86_64": 1145,
+                "X86": 1145
+              },
+              "isExperimental": false,
+              "minSdk": 33,
+              "description": "Latest release; requires Android 13+."
+            }
+          ]
+        },
+        {
+          "packageName": "com.pioneerdj.WeDJ",
+          "name": "WeDJ",
+          "description": null,
+          "apkFileType": "APK",
+          "appIconColor": "#007CFC",
+          "signatures": [
+            "f17221c501b8a3b13a6903419fe9afd62653c5898f6c80be698f9e10ade998c1"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.1.1.3",
+              "versionCodes": {
+                "ARM64_V8A": 1113,
+                "ARMEABI_V7A": 1113,
+                "X86_64": 1113,
+                "X86": 1113
+              },
+              "isExperimental": false,
+              "minSdk": 28,
+              "description": "Use on Android 9-12."
             }
           ]
         }
