@@ -53,41 +53,6 @@ object Constants {
         )
     )
 
-    // Remote Desktop Manager 2026.3.1.5 (version code 500987), distributed as an XAPK.
-    // Xamarin/.NET app: the business logic lives in AOT-compiled assemblies,
-    // only the Java/Xamarin glue in the dex files can be patched.
-    val RDM_COMPATIBILITY = Compatibility(
-        name = "Remote Desktop Manager",
-        packageName = "com.devolutions.remotedesktopmanager",
-        apkFileType = ApkFileType.XAPK,
-        appIconColor = 0xE8523F,
-        targets = listOf(
-            AppTarget(
-                version = "2026.3.1.5",
-                versionCode = 500987,
-                minSdk = 24
-            )
-        )
-    )
-
-    // TeraBox 4.27.5 (version code 702), distributed as an XAPK.
-    val TERABOX_COMPATIBILITY = Compatibility(
-        name = "TeraBox",
-        packageName = "com.dubox.drive",
-        apkFileType = ApkFileType.XAPK,
-        appIconColor = 0x226DF6,
-        signatures = setOf(
-            "b75fd2b70084d7e0813b8f74dd74b62ab79b2aa0ce1372331a1841bd88eed993"
-        ),
-        targets = listOf(
-            AppTarget(
-                version = "4.27.5",
-                versionCode = 702,
-                minSdk = 23
-            )
-        )
-    )
-
     // Universal Copy 7.2.0 (version code 106), distributed as an XAPK.
     val UNIVERSAL_COPY_COMPATIBILITY = Compatibility(
         name = "Universal Copy",

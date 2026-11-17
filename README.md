@@ -14,7 +14,6 @@ This bundle currently supports:
 |-----|---------|---------|
 | EZVIZ | 7.6.1.0824 | Remove ads, bypass SSL pinning, bypass signature check |
 | 1.1.1.1 | 6.38.11 | Disable analytics, disable SSL pinning, spoof WARP+ unlimited UI |
-| TeraBox | 4.27.5 | Hide ads while keeping rewarded ads on the Benefits page |
 | Universal Copy | 7.2.0 | Unlock Plus, remove ads/upgrade prompts and the Internet permission |
 | NetMonster | 4.0.5 | Unlock premium |
 | HTTP Sniffer | 2.5.2-ad_mob, 2.4.9-ad_mob | Unlock VIP |
