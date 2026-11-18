@@ -16,10 +16,10 @@ private const val PATCH = "Bypass SSL pinning"
 private const val NETWORK_SECURITY_CONFIG = "res/xml/terabox_network_security_config.xml"
 
 /**
- * Adds the user key store to the trust anchors of the manifest's network
- * security config, which is what lets the platform trust manager (and therefore
- * OkHttp and WebView) accept a debugging proxy certificate. User certificates
- * are ignored by Android since API 24 unless the config opts in.
+ * Opts the manifest's network security config into user-added certificates,
+ * which is what lets the platform trust manager (and therefore OkHttp and
+ * WebView) accept a debugging proxy. Android ignores those certificates since
+ * API 24 unless the config says otherwise.
  */
 private val trustUserCertificatesPatch = resourcePatch(description = "Trust user-added certificates") {
     execute {

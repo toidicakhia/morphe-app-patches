@@ -4,7 +4,7 @@
   "patches": [
     {
       "name": "Auto claim Benefits tasks",
-      "description": "Presses the Benefits/task-center controls by CSS selector (rewarded videos, claims, check-in rewards, coin expiry) and shows what it clicked. It only presses a control that is visible, on top and unchanged since the last pass, and marks one inert when nothing happens; complete, subscribe and card-exchange controls are skipped. Leaves the check-in page once it is done. Pair it with \"Auto reward ads\".",
+      "description": "Presses the Benefits/task-center controls by CSS selector (watch-ad group, check-in, lucky bag) and shows what it clicked. Skips complete, subscribe, card-exchange and disabled controls, and drops an inert one for a minute. Closes the check-in page when done. Pair it with \"Auto reward ads\".",
       "default": false,
       "category": null,
       "compatiblePackages": [

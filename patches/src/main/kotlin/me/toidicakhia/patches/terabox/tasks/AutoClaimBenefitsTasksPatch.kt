@@ -14,18 +14,16 @@ private const val TASK_CLICKER = "Lme/toidicakhia/extension/terabox/TeraboxTaskC
 
 /**
  * The task center is an offline FE pack the app downloads, so its class names
- * are stable per pack version but change between packs. The injected script
- * targets those selectors only (no label matching), skips destructive controls
- * and presses them one by one.
+ * are stable per pack version but change between packs. The script targets
+ * those selectors only, never labels, and skips destructive controls.
  */
 @Suppress("unused")
 val autoClaimBenefitsTasksPatch = bytecodePatch(
     name = "Auto claim Benefits tasks",
-    description = "Presses the Benefits/task-center controls by CSS selector (rewarded videos, " +
-        "claims, check-in rewards, coin expiry) and shows what it clicked. It only presses a control " +
-        "that is visible, on top and unchanged since the last pass, and marks one inert when nothing " +
-        "happens; complete, subscribe and card-exchange controls are skipped. Leaves the check-in " +
-        "page once it is done. Pair it with \"Auto reward ads\".",
+    description = "Presses the Benefits/task-center controls by CSS selector (watch-ad group, " +
+        "check-in, lucky bag) and shows what it clicked. Skips complete, subscribe, card-exchange " +
+        "and disabled controls, and drops an inert one for a minute. Closes the check-in page when " +
+        "done. Pair it with \"Auto reward ads\".",
     default = false
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)

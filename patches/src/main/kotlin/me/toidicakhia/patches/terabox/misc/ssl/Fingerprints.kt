@@ -61,10 +61,7 @@ private fun hostnameVerifierSession(owner: String) = Fingerprint(
     ),
 )
 
-/**
- * Custom verifiers of the `wd` networking stack (Tencent's) and of the WebView
- * bridge, all of them wrap the strict platform verifier.
- */
+/** Third-party and obfuscated verifiers that wrap the strict platform one. */
 private fun hostnameVerifier(owner: String) = Fingerprint(
     definingClass = owner,
     name = "verify",
@@ -76,9 +73,8 @@ private fun hostnameVerifier(owner: String) = Fingerprint(
 )
 
 /**
- * Strict wrapper around the platform trust manager: it keeps a host name and
- * throws `CertificateException` when the chain or that host name does not
- * match, unlike the sibling wrapper that swallows the exception.
+ * Strict wrapper around the platform trust manager: throws
+ * `CertificateException` when the chain or host name does not match.
  */
 private fun trustManager(owner: String) = Fingerprint(
     definingClass = owner,

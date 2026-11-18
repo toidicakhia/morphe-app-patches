@@ -19,9 +19,9 @@ private const val REWARD_SHOW_LISTENER =
 private const val AD_CLOSER = "Lme/toidicakhia/extension/terabox/TeraboxAdCloser;"
 
 /**
- * The ad is not faked: it plays, the SDK grants the reward through
- * `OnRewardShowListener.___` and only then the extension finishes the ad
- * activity, which would otherwise wait for the user to dismiss the end card.
+ * The ad plays normally and the SDK grants the reward through
+ * `OnRewardShowListener.___`; the extension is notified first so it can close
+ * the ad activity (and the native ad that follows) once the reward is given.
  */
 @Suppress("unused")
 val autoRewardAdsPatch = bytecodePatch(
@@ -34,12 +34,9 @@ val autoRewardAdsPatch = bytecodePatch(
     extendWith("extensions/extension.mpe")
 
     execute {
-        // `___()` is the "user earned reward" callback. The activity is resolved
-        // *before* the callback is forwarded: the Benefits listener starts an
-        // extra native-ad activity from that callback, which would otherwise be
-        // the top activity. The extension keeps a reference to the ad activity
-        // and finishes it after a short delay, so the app's own reward handling
-        // (privilege unlock, H5 `isSuccess` callback) still runs first.
+        // `___()` is "user earned reward". `close()` records the reward and
+        // schedules the cleanup; the callback itself still runs, so the app
+        // unlocks the privilege and answers the H5 before the ad disappears.
         val method = RewardEarnedFingerprint.matchSingle().method
         val callbackIndex = method.indexOfFirstInstructionOrThrow {
             opcode == Opcode.INVOKE_INTERFACE &&

@@ -1,8 +1,6 @@
 package me.toidicakhia.extension.terabox;
 
 import android.app.Activity;
-import android.content.Context;
-import android.content.ContextWrapper;
 import android.os.Build;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
@@ -17,29 +15,28 @@ import java.util.WeakHashMap;
  * Keeps the TeraBox task-center and check-in pages clicking themselves.
  *
  * Both pages are offline packs the app downloads, so the injected script
- * targets their own class names by CSS selector rather than by label: reward
- * popups (the "watch a video for an extra reward" button before the OK button),
- * v3 task cards, the v5 task list, the featured card and the check-in calendar.
- * Destructive controls (complete, subscribe/remind, close, card exchange) are
- * never part of the list, and every press goes through a per-button cooldown.
+ * targets their own class names by CSS selector instead of by label: reward
+ * popups, the "watch ads" task group, the featured card and the check-in
+ * calendar. Destructive controls (complete, subscribe/remind, close, card
+ * exchange) are never pressed, and every press goes through a cooldown.
  *
- * A press only happens when the control is visible, on screen and not covered
- * by a real modal container, after a brief settle and with no loading overlay
- * up. Decorative `.mask`/gradient headers do not block it: only modal classes
- * found in the offline pack do, otherwise the clicker stalls reporting "wait".
- * A press that changes nothing blacklists only that one control for a minute,
- * never the whole clicker. On the check-in page a real sign-in is detected by
- * today's cell showing an img (not the removed `.date.today`); once signed and
- * quiet, the page closes itself through its own `closePage` bridge.
+ * A control is pressed only when it is visible, enabled, on screen and not
+ * covered by a real modal. A press that changes nothing drops that one control
+ * for a minute, never the whole clicker. On the check-in page a real sign-in is
+ * detected by today's cell showing an img; once signed and quiet, the page
+ * closes through its own `closePage` bridge.
  */
 @SuppressWarnings("unused")
 public final class TeraboxTaskClicker {
 
     private static final String TAG = "TeraboxTaskClicker";
 
-    private static final long POLL_INTERVAL_MS = 1500L;
+    private static final long POLL_INTERVAL_MS = 800L;
 
-    private static final int MAX_POLLS = 4800;
+    private static final int MAX_POLLS = 9000;
+
+    /** Re-inject the script occasionally as a keepalive; the script is idempotent. */
+    private static final int KEEPALIVE_POLLS = 12;
 
     /**
      * Pages that can host the reward task list. The Benefits entry may point at
@@ -128,6 +125,11 @@ public final class TeraboxTaskClicker {
         /** Set only once an ad has actually covered this page. */
         private boolean sawAd;
 
+        /** The script is injected once per URL, not on every poll. */
+        private boolean injected;
+
+        private int pollsSinceInject;
+
         Poller(WebView webView) {
             this.webViewRef = new WeakReference<>(webView);
         }
@@ -140,72 +142,103 @@ public final class TeraboxTaskClicker {
             }
 
             try {
-                // A "watch video" task runs an ad, then the H5 needs a few
-                // seconds to answer the reward and refresh the task list.
-                // Pause for the whole chain: during the ad, while its follow-up
-                // native ad or another full-screen page covers this WebView,
-                // and for the H5 refresh window after the reward. Otherwise the
-                // clicker presses the same task a second time and opens another
-                // ad request while the first reward is still being processed.
-                boolean adOnTop = TeraboxAdCloser.isAdOnTop();
-                Activity host = activityOf(webView);
-                boolean otherPage = host != null && !TeraboxAdCloser.isOnTop(host);
-                // `recentlyRewarded()` is global and can still be true from an
-                // ad watched on a different screen. Only honour it on this page
-                // after an ad has actually shown here, otherwise opening the
-                // Benefits page right after any reward reports "reward received"
-                // and pauses the clicker for no reason.
-                if (adOnTop) {
-                    sawAd = true;
-                } else if (!TeraboxAdCloser.recentlyRewarded()) {
-                    sawAd = false;
-                }
-                boolean holding = sawAd && TeraboxAdCloser.recentlyRewarded();
-                boolean pauseNow = adOnTop || otherPage || holding;
-                String status = adOnTop ? "watching ad"
-                        : otherPage ? "waiting for the page"
-                        : holding ? "reward received, waiting" : "clicking";
-                if (pauseNow != paused || !status.equals(lastStatus)) {
-                    paused = pauseNow;
-                    lastStatus = status;
-                    Log.i(TAG, (pauseNow ? "Clicker paused: " : "Clicker resumed: ") + status);
-                }
-                webView.evaluateJavascript(
-                        "window.__tbTaskPaused=" + (pauseNow ? "1" : "0") + ";",
-                        null);
-
-                String url = webView.getUrl();
-                if (url != null && isTaskPage(url)) {
-                    if (url.hashCode() != lastUrlHash) {
-                        lastUrlHash = url.hashCode();
-                        Log.i(TAG, "Injecting the task clicker into " + url);
-                    }
-                    // The script guards itself, so repeated injection only
-                    // restarts the clicker after a full page reload.
-                    webView.evaluateJavascript(SCRIPT, null);
-                    TeraboxTaskHud.status(webView, status);
-                } else {
-                    if (url != null && url.hashCode() != lastUrlHash) {
-                        lastUrlHash = url.hashCode();
-                        Log.d(TAG, "Not a task page: " + url);
-                    }
-                    TeraboxTaskHud.hide(webView);
-                }
+                syncState(webView);
+                loadScript(webView);
             } catch (Throwable throwable) {
                 Log.w(TAG, "Could not inject the task clicker", throwable);
             }
 
             if (++polls >= MAX_POLLS || isGone(webView)) {
-                synchronized (ATTACHED) {
-                    ATTACHED.remove(webView);
-                }
-                TeraboxTaskHud.hide(webView);
-                // Stop polling for ads, but never leave the clicker paused.
-                webView.evaluateJavascript("window.__tbTaskPaused=0;", null);
+                stop(webView);
                 return;
             }
 
             webView.postDelayed(this, POLL_INTERVAL_MS);
+        }
+
+        /**
+         * Pauses the page while an ad is in flight and mirrors the state on the
+         * ad window, which covers this WebView and its HUD.
+         */
+        private void syncState(WebView webView) {
+            boolean adOnTop = TeraboxAdCloser.isAdOnTop();
+            Activity host = TeraboxTaskHud.activityOf(webView);
+            boolean otherPage = host != null && !TeraboxAdCloser.isOnTop(host);
+            // `recentlyRewarded()` is global and can still be true from an ad
+            // watched elsewhere. Only honour it here after an ad showed on this
+            // page, otherwise opening Benefits right after a reward reports
+            // "reward received" and pauses for no reason.
+            if (adOnTop) {
+                sawAd = true;
+            } else if (!TeraboxAdCloser.recentlyRewarded()) {
+                sawAd = false;
+            }
+            boolean holding = sawAd && TeraboxAdCloser.recentlyRewarded();
+            boolean pauseNow = adOnTop || otherPage || holding;
+            String status = adOnTop ? "watching ad"
+                    : otherPage ? "waiting for the page"
+                    : holding ? "reward received, waiting" : "clicking";
+            boolean wasPaused = paused;
+            if (pauseNow != paused || !status.equals(lastStatus)) {
+                paused = pauseNow;
+                lastStatus = status;
+                Log.i(TAG, (pauseNow ? "Clicker paused: " : "Clicker resumed: ") + status);
+            }
+            // Re-send the pause flag every poll in case the page reloaded; on
+            // resume nudge the page instead of waiting for its next heartbeat.
+            if (pauseNow || wasPaused) {
+                String flags = "window.__tbTaskPaused=" + (pauseNow ? "1" : "0") + ";";
+                if (!pauseNow && wasPaused) {
+                    flags = flags + "window.__tbTick&&window.__tbTick();";
+                }
+                webView.evaluateJavascript(flags, null);
+            }
+
+            Activity adActivity = TeraboxAdCloser.currentAdActivity();
+            if (adActivity != null) {
+                TeraboxTaskHud.adOverlay(adActivity, "Auto task · watching ad");
+            } else {
+                TeraboxTaskHud.hideAdOverlay();
+            }
+        }
+
+        /** Injects the script once per URL, with a periodic keepalive. */
+        private void loadScript(WebView webView) {
+            String url = webView.getUrl();
+            if (url == null || !isTaskPage(url)) {
+                injected = false;
+                pollsSinceInject = 0;
+                if (url != null && url.hashCode() != lastUrlHash) {
+                    lastUrlHash = url.hashCode();
+                    Log.d(TAG, "Not a task page: " + url);
+                }
+                TeraboxTaskHud.hide(webView);
+                return;
+            }
+            if (url.hashCode() != lastUrlHash) {
+                lastUrlHash = url.hashCode();
+                injected = false;
+                pollsSinceInject = 0;
+                Log.i(TAG, "Injecting the task clicker into " + url);
+            }
+            // The script guards itself; the keepalive only restarts it after a
+            // silent reload that did not change the URL.
+            if (!injected || ++pollsSinceInject >= KEEPALIVE_POLLS) {
+                webView.evaluateJavascript(SCRIPT, null);
+                injected = true;
+                pollsSinceInject = 0;
+            }
+            TeraboxTaskHud.status(webView, lastStatus);
+        }
+
+        /** Detaches the HUD and never leaves the page paused. */
+        private void stop(WebView webView) {
+            synchronized (ATTACHED) {
+                ATTACHED.remove(webView);
+            }
+            TeraboxTaskHud.hide(webView);
+            TeraboxTaskHud.hideAdOverlay();
+            webView.evaluateJavascript("window.__tbTaskPaused=0;", null);
         }
 
         private boolean isGone(WebView webView) {
@@ -222,21 +255,6 @@ public final class TeraboxTaskClicker {
         }
     }
 
-    /** Walk a WebView's (possibly wrapped) context to the hosting Activity. */
-    private static Activity activityOf(WebView webView) {
-        Context context = webView.getContext();
-        while (context != null) {
-            if (context instanceof Activity) {
-                return (Activity) context;
-            }
-            if (!(context instanceof ContextWrapper)) {
-                return null;
-            }
-            context = ((ContextWrapper) context).getBaseContext();
-        }
-        return null;
-    }
-
     private static boolean isTaskPage(String url) {
         String lower = url.toLowerCase();
         for (String hint : TASK_PAGE_HINTS) {
@@ -248,26 +266,15 @@ public final class TeraboxTaskClicker {
     }
 
     /**
-     * CSS targets come from the offline packs the app downloads, captured on
-     * 4.27.5. The order is the one the user expects: check-in first (the sign-in
-     * entry, then the calendar/flash on that page), then only the "Xem quảng cáo"
-     * watch-ad task, and finally the lucky-bag "Watch video (n/m)" chain. Reward
-     * popups sit at the very top because they belong to an ad already in flight.
-     * The five daily tasks are deliberately NOT automated: they share the same
-     * `.btn.go` class as the watch-ad task, so the buttons are taken only from
-     * the group whose heading says "Xem quảng cáo" / "Watch ads". The sign-in
-     * entry is pressed at most once per page load so returning from that page
-     * does not reopen it. Complete, disabled, subscribe/remind, close, recharge,
-     * the makeup-card rows and the `.toGet` card-exchange link are never pressed.
+     * CSS targets come from the offline packs captured on 4.27.5. The order is
+     * reward popups, check-in, then only the "Xem quảng cáo" / "Watch ads" task
+     * group, with the lucky bag last. The five daily tasks share `.btn.go` with
+     * the watch-ad task, so their buttons are taken only from that group.
      *
-     * Instead of waiting for the target set to settle, the script only needs a
-     * brief 800 ms after a URL change. It scrolls an off-screen control in once,
-     * and blocks a press only when a real modal container is on top at the
-     * centre: a generic `.mask`/sticky header must not stall it. A press that
-     * changes neither URL nor target counts blacklists just that control for a
-     * minute. Once `/taskcenter/signin` shows an img on today's cell (v5 uses
-     * `.single`, not `.date.today`) and nothing is left to press, it closes via
-     * the page's own `closePage` bridge.
+     * The sign-in entry is pressed once per page load. Off-screen controls are
+     * scrolled in once; a real modal at the press point blocks the click. A
+     * press that changes nothing drops that control for a minute. Once the
+     * check-in page is signed and quiet, it closes through `closePage`.
      */
     private static final String SCRIPT = String.join(" ",
             "(function(){",
@@ -298,8 +305,8 @@ public final class TeraboxTaskClicker {
             "function watchTargets(now,i){var g=watchGroup();if(!g)return [];var list;try{list=g.querySelectorAll(WATCH_SELECTOR);}catch(e){return [];}var out=[];for(var j=0;j<list.length;j++){var el=list[j];if(visible(el)&&enabled(el)&&ready(el,i,now))out.push(el);}return out;}",
             "var MODALS='.popup-bg-box,.popup-mask,.dialog-mask,.base-popup-mask,.auto-sign-rewards-mask,.continuous-sign-in-popup,.sign-rules,.makeup-card-content,.task-sheet-mask,.record-drawer-mask,.guide-ad-mask,.reward-toast';",
             "var LOADERS='.loading-box,.el-m-toast__spinner,.task-card__loading';",
-            "var COOLDOWN=12000,DEAD=60000,MIN_GAP=3000,PER_MIN=10,TICK=1000;",
-            "var dead={},lastAt={},lastNote='',noteAt=0,recent=[],scrolled='',pending=null,url=(window.location&&window.location.href)||'',pageAt=Date.now(),loadStart=0,quietSince=0,closed=false,busy=false,lastClick=0,lastSig='',signEntryDone=false;",
+            "var COOLDOWN=8000,DEAD=60000,MIN_GAP=1500,PER_MIN=10,TICK=700,SETTLE=400,VERIFY=1500,MIN_TICK=250;",
+            "var dead={},lastAt={},lastNote='',noteAt=0,recent=[],scrolled='',pending=null,url=(window.location&&window.location.href)||'',pageAt=Date.now(),loadStart=0,quietSince=0,closed=false,busy=false,lastClick=0,lastSig='',signEntryDone=false,lastRun=0;",
             "function label(el){try{return (''+((el.innerText||el.textContent)||'')).replace(/\\s+/g,' ').trim();}catch(e){return '';}}",
             "function cls(el){try{var c=el&&el.className;return ''+((c&&c.baseVal!==undefined)?c.baseVal:c||'');}catch(e){return '';}}",
             "function note(m){try{var n=Date.now();if(m===lastNote&&n-noteAt<5000)return;lastNote=m;noteAt=n;window.tbTaskHud&&window.tbTaskHud.note(m);}catch(e){}}",
@@ -319,14 +326,16 @@ public final class TeraboxTaskClicker {
             "var href=(window.location&&window.location.href)||'';",
             "if(pending&&(sigOf()!==pending.sig||href!==pending.url))pending=null;",
             "if(window.__tbTaskPaused){quietSince=0;note('ad on screen, waiting');return;}",
-            "if(busy)return;busy=true;",
-            "try{",
+            "if(busy)return;",
             "var now=Date.now();",
+            "if(now-lastRun<MIN_TICK)return;lastRun=now;",
+            "busy=true;",
+            "try{",
             "if(href!==url){url=href;pageAt=now;scrolled='';pending=null;quietSince=0;closed=false;}",
-            "if(pending&&now-pending.at>=2500){dead[pending.key]=now;pending=null;note('that control had no effect, skipping it for a minute');}",
-            "if(now-pageAt<800){note('page just loaded');return;}",
+            "if(pending&&now-pending.at>=VERIFY){dead[pending.key]=now;pending=null;note('that control had no effect, skipping it for a minute');}",
+            "if(now-pageAt<SETTLE){note('page just loaded');return;}",
             "var cand=pick(now);",
-            "if(loading()){if(!loadStart)loadStart=now;if(now-loadStart<8000){note('waiting for the page to finish loading');return;}}",
+            "if(!cand&&loading()){if(!loadStart)loadStart=now;if(now-loadStart<4000){note('waiting for the page to finish loading');return;}}",
             "loadStart=0;",
             "if(!cand){if(!quietSince)quietSince=now;if(!closed&&now-quietSince>=10000&&signDone()){closed=true;closePage();note('check-in complete, closing page');}else note('no matching control on this page');return;}",
             "quietSince=now;",
@@ -342,7 +351,7 @@ public final class TeraboxTaskClicker {
             "try{cand.el.click();}catch(e){}",
             "hud(label(cand.el)||cand.key);",
             "}finally{busy=false;}}",
-            "function start(){lastSig=sigOf();setInterval(tick,TICK);try{new MutationObserver(function(){var n=Date.now();if(n-lastScan<1000)return;lastScan=n;var s=sigOf();if(s!==lastSig){lastSig=s;quietSince=0;scrolled='';}}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}tick();}",
+            "function start(){lastSig=sigOf();window.__tbTick=function(){lastRun=0;tick();};setInterval(tick,TICK);try{new MutationObserver(function(){var n=Date.now();if(n-lastScan<200)return;lastScan=n;var s=sigOf();if(s!==lastSig){lastSig=s;quietSince=0;scrolled='';}tick();}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','disabled','aria-disabled']});}catch(e){}tick();}",
             "var lastScan=0;",
             "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',start);}else{start();}",
             "})();"
