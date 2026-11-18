@@ -399,6 +399,59 @@
       "options": []
     },
     {
+      "name": "Spoofer server",
+      "description": "Sends Locket's API traffic (feed, profile, AI frames, captions) to a self-hosted spoofer server instead of api.locketcamera.com. Enter the server address; the app keeps using the server's own HTTPS certificate, so no DNS profile or CA install is needed. Enable the second option to route RevenueCat and Firebase Remote Config through the same server as well. Not selected by default.",
+      "default": false,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.locket.Locket",
+          "name": "Locket Widget",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#FFB201",
+          "signatures": [
+            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.247.1",
+              "versionCodes": {
+                "ARM64_V8A": 632,
+                "ARMEABI_V7A": 632,
+                "X86_64": 632,
+                "X86": 632
+              },
+              "isExperimental": false,
+              "minSdk": 27,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": [
+        {
+          "key": "spooferServer",
+          "title": "Spoofer server",
+          "description": "Address of the spoofer server, for example https://spoofer.example. It must answer HTTPS with a certificate for this name. A scheme is optional and is assumed to be https when missing; a path is not supported.",
+          "required": true,
+          "type": "kotlin.String",
+          "default": null,
+          "values": null
+        },
+        {
+          "key": "routeRevenueCat",
+          "title": "Route RevenueCat and Remote Config",
+          "description": "Also sends api.revenuecat.com and firebaseremoteconfig.googleapis.com to the spoofer server, so its Gold payload and feature flags reach the app without a DNS profile. The server must answer /v1/subscribers*, /v1/receipts* and /v1/projects*. Rebuilding the app's dex files makes patching take noticeably longer.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        }
+      ]
+    },
+    {
       "name": "Trust User Certificates",
       "description": "Adds user-installed CA certificates to the network security config so native traffic can be inspected with a debugging proxy. Flutter's Dart HTTP stack keeps its own trust store.",
       "default": false,
