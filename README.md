@@ -228,7 +228,7 @@ python3 .github/scripts/generate_patches_readme.py \
 
 ## 🧑‍💻 Development workflow
 
-- Make changes on the `dev` branch.
+- Make changes on the `main` branch.
 - Use [semantic commit](https://kapeli.com/cheat_sheets/Semantic_Commits.docset/Contents/Resources/Documents/index)
   messages:
   - `feat: add a new feature`
@@ -238,7 +238,7 @@ python3 .github/scripts/generate_patches_readme.py \
   [release workflow](.github/workflows/release.yml) manually from the Actions tab
   (**Run workflow**). [`.releaserc`](.releaserc) determines the version from the commit
   history.
-- Run the workflow on `dev` for a pre-release and on `main` for a stable release.
+- Run the workflow on `main` to create a stable release.
 - Do not create releases or edit generated files manually.
 
 ## 🤓 Tips
