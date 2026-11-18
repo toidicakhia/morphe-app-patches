@@ -2,6 +2,7 @@ package me.toidicakhia.extension.terabox;
 
 import android.os.Build;
 import android.util.Log;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
 import java.lang.ref.WeakReference;
@@ -23,7 +24,7 @@ public final class TeraboxTaskClicker {
 
     private static final long POLL_INTERVAL_MS = 1500L;
 
-    private static final int MAX_POLLS = 1200;
+    private static final int MAX_POLLS = 4800;
 
     /**
      * Pages that can host the reward task list. The Benefits entry may point at
@@ -41,6 +42,9 @@ public final class TeraboxTaskClicker {
 
     private static final Map<WebView, Boolean> ATTACHED =
             Collections.synchronizedMap(new WeakHashMap<WebView, Boolean>());
+
+    /** Name of the bridge the injected script uses to report what it pressed. */
+    private static final String HUD_BRIDGE = "tbTaskHud";
 
     private TeraboxTaskClicker() {
     }
@@ -61,7 +65,26 @@ public final class TeraboxTaskClicker {
             ATTACHED.put(webView, Boolean.TRUE);
         }
 
+        webView.addJavascriptInterface(new HudBridge(webView), HUD_BRIDGE);
         webView.post(new Poller(webView));
+    }
+
+    /** Receives the label of the control the injected script just pressed. */
+    private static final class HudBridge {
+
+        private final WeakReference<WebView> webViewRef;
+
+        HudBridge(WebView webView) {
+            this.webViewRef = new WeakReference<>(webView);
+        }
+
+        @JavascriptInterface
+        public void clicked(String label) {
+            final WebView webView = webViewRef.get();
+            if (webView != null) {
+                TeraboxTaskHud.clicked(webView, label);
+            }
+        }
     }
 
     private static final class Poller implements Runnable {
@@ -73,6 +96,8 @@ public final class TeraboxTaskClicker {
         private int polls;
 
         private int lastUrlHash;
+
+        private boolean paused;
 
         Poller(WebView webView) {
             this.webViewRef = new WeakReference<>(webView);
@@ -86,6 +111,18 @@ public final class TeraboxTaskClicker {
             }
 
             try {
+                // Keep the page-side clicker paused while an ad is on screen,
+                // otherwise the hidden task page would start another task in
+                // the middle of the current ad.
+                boolean adOnTop = TeraboxAdCloser.isAdOnTop();
+                if (adOnTop != paused) {
+                    paused = adOnTop;
+                    Log.i(TAG, adOnTop ? "Ad on screen, clicker paused" : "Ad closed, clicker resumed");
+                }
+                webView.evaluateJavascript(
+                        "window.__tbTaskPaused=" + (adOnTop ? "1" : "0") + ";",
+                        null);
+
                 String url = webView.getUrl();
                 if (url != null && isTaskPage(url)) {
                     if (url.hashCode() != lastUrlHash) {
@@ -95,9 +132,13 @@ public final class TeraboxTaskClicker {
                     // The script guards itself, so repeated injection only
                     // restarts the clicker after a full page reload.
                     webView.evaluateJavascript(SCRIPT, null);
-                } else if (url != null && url.hashCode() != lastUrlHash) {
-                    lastUrlHash = url.hashCode();
-                    Log.d(TAG, "Not a task page: " + url);
+                    TeraboxTaskHud.status(webView, adOnTop ? "watching ad" : "clicking");
+                } else {
+                    if (url != null && url.hashCode() != lastUrlHash) {
+                        lastUrlHash = url.hashCode();
+                        Log.d(TAG, "Not a task page: " + url);
+                    }
+                    TeraboxTaskHud.hide(webView);
                 }
             } catch (Throwable throwable) {
                 Log.w(TAG, "Could not inject the task clicker", throwable);
@@ -107,6 +148,9 @@ public final class TeraboxTaskClicker {
                 synchronized (ATTACHED) {
                     ATTACHED.remove(webView);
                 }
+                TeraboxTaskHud.hide(webView);
+                // Stop polling for ads, but never leave the clicker paused.
+                webView.evaluateJavascript("window.__tbTaskPaused=0;", null);
                 return;
             }
 
@@ -137,21 +181,28 @@ public final class TeraboxTaskClicker {
         return false;
     }
 
+    /**
+     * CSS targets are taken from the live `t-taskCenter` bundle of the web app,
+     * in priority order: reward popup button, task card claim, task card
+     * "watch/go", retroactive card entry, daily check-in button, today's
+     * check-in icon and the coin-expiry "watch video" button. The class names
+     * are semantic and not hashed (only the scoped `data-v-*` attributes are),
+     * so nothing is matched by its label anymore. `.complete-btn`,
+     * `.remind-btn` and close buttons are never part of the list.
+     */
     private static final String SCRIPT = String.join(" ",
             "(function(){",
             "if(window.__tbTaskClicker){return;}window.__tbTaskClicker=1;",
-            "var POS=['watch','view ad','claim','collect','receive','get reward','earn','check in','sign in','daily','xem','nhận','lấy','điểm danh','quảng cáo','nhận thưởng','领取','領取','觀看','观看','获得','獲取','签到','簽到','받기','수령','출석','получить','смотреть','受け取','視聴','รับ','รับรางวัล'];",
-            "var NEG=['buy','purchase','pay','subscribe','recharge','top up','upgrade','vip','premium','delete','remove','logout','sign out','log out','cancel','back','close','share','invite','follow','install','download','open app','claimed','already','completed','expired','mua','thanh toán','nâng cấp','xoá','xóa','đăng xuất','huỷ','hủy','chia sẻ','mời','cài đặt','tải xuống','đã nhận','đã lĩnh','hết hạn','购买','支付','订阅','刪除','删除','退出','取消','分享','邀请','邀請','下載','下载','已领取','已領取','已完成','설치','다운로드','구매','결제','삭제','로그아웃','купить','оплатить','удалить','выход','購入','支払','ダウンロード','インストール'];",
-            "var SEL='button,[role=button],a,[class*=btn],[class*=Btn],[class*=button],[class*=claim],[class*=Claim],[class*=reward],[class*=Reward],[class*=task],[class*=Task],[class*=receive],[class*=Receive]';",
-            "var last=new WeakMap(),attempts=new WeakMap(),COOLDOWN=8000,RETRY=120000,MIN_GAP=1100,MAX_PER_MINUTE=25,recent=[];",
-            "function txt(el){try{var t=el.innerText||el.textContent||'';return (''+t).replace(/\\s+/g,' ').trim().toLowerCase();}catch(e){return '';}}",
-            "function visible(el){try{var r=el.getBoundingClientRect();if(r.width<4||r.height<4){return false;}var s=window.getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&s.pointerEvents!=='none';}catch(e){return false;}}",
-            "function enabled(el){try{if(el.disabled){return false;}if(el.getAttribute&&(el.getAttribute('aria-disabled')==='true'||el.getAttribute('disabled')!==null)){return false;}var raw=el.className||'';if(raw&&raw.baseVal!==undefined){raw=raw.baseVal;}raw=raw+' '+(el.getAttribute?(''+(el.getAttribute('data-status')||'')):'');return !/disabl|grey|gray|claimed|received|done|complet|finish|expired|vô hiệu|đã nhận|领取过|已完成/i.test(raw);}catch(e){return false;}}",
-            "function score(el){var t=txt(el);if(!t||t.length>48){return 0;}for(var i=0;i<NEG.length;i++){if(t.indexOf(NEG[i])>=0){return 0;}}var s=0;for(var j=0;j<POS.length;j++){if(t.indexOf(POS[j])>=0){s+=3;break;}}var c=''+(el.className||'');if(/claim|reward|task|btn|button/i.test(c)){s+=1;}return s;}",
-            "function deep(root,out){try{var all=root.querySelectorAll(SEL);for(var i=0;i<all.length;i++){out.push(all[i]);}var nodes=root.querySelectorAll('*');for(var j=0;j<nodes.length;j++){if(nodes[j].shadowRoot){deep(nodes[j].shadowRoot,out);}}var frames=root.querySelectorAll('iframe');for(var k=0;k<frames.length;k++){try{if(frames[k].contentDocument){deep(frames[k].contentDocument,out);}}catch(e){}}}catch(e){}}",
+            "var TARGETS=['.popup-bg-box .popup-box .btn','.task-card .task-btn .receive-btn','.task-card .task-btn .btn:not(.receive-btn):not(.complete-btn)','.sign-in-box .sub-title .title-left','.sign-in-box .sign-button','.sign-in-box .calendar-body .single .sign-flash','.expire-coin-box .view-video-btn'];",
+            "var last=new WeakMap(),attempts=new WeakMap(),COOLDOWN=12000,RETRY=60000,MIN_GAP=3000,MAX_PER_MINUTE=10,recent=[],lastSpot=null,lastSpotAt=0;",
+            "function label(el){try{var t=el.innerText||el.textContent||'';return (''+t).replace(/\\s+/g,' ').trim();}catch(e){return '';}}",
+            "function visible(el){try{var r=el.getBoundingClientRect();if(r.width<4||r.height<4){return false;}var s=window.getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&parseFloat(s.opacity||'1')!==0&&s.pointerEvents!=='none';}catch(e){return false;}}",
+            "function enabled(el){try{if(el.disabled){return false;}if(el.getAttribute&&(el.getAttribute('aria-disabled')==='true'||el.getAttribute('disabled')!==null)){return false;}var raw=el.className||'';if(raw&&raw.baseVal!==undefined){raw=raw.baseVal;}raw=''+raw;return !/disabl|grey|gray|claimed|received|done|expired|notClickable/i.test(raw);}catch(e){return false;}}",
+            "function ready(el,now){if((attempts.get(el)||0)>=2&&now-(last.get(el)||0)<RETRY){return false;}if(now-(last.get(el)||0)<COOLDOWN){return false;}if(lastSpot&&now-lastSpotAt<COOLDOWN){var rc=el.getBoundingClientRect();if(Math.abs((rc.left+rc.right)/2-lastSpot.x)<24&&Math.abs((rc.top+rc.bottom)/2-lastSpot.y)<24){return false;}}return true;}",
+            "function target(now){for(var i=0;i<TARGETS.length;i++){var list;try{list=document.querySelectorAll(TARGETS[i]);}catch(e){continue;}for(var j=0;j<list.length;j++){var el=list[j];if(!visible(el)||!enabled(el)){continue;}if(!ready(el,now)){continue;}return el;}}return null;}",
             "var busy=false,lastClick=0;",
-            "function tick(){if(busy){return;}busy=true;try{var now=Date.now();if(now-lastClick<MIN_GAP){return;}recent=recent.filter(function(t){return now-t<60000;});if(recent.length>=MAX_PER_MINUTE){return;}var list=[],best=null,bestScore=0;deep(document,list);for(var i=0;i<list.length;i++){var el=list[i];if(!visible(el)||!enabled(el)){continue;}var sc=score(el);if(!sc){continue;}var tries=attempts.get(el)||0;if(tries>=4&&now-(last.get(el)||0)<RETRY){continue;}if(now-(last.get(el)||0)<COOLDOWN){continue;}if(sc>bestScore){best=el;bestScore=sc;}}if(best){last.set(best,now);attempts.set(best,(attempts.get(best)||0)+1);lastClick=now;recent.push(now);try{best.scrollIntoView({block:'center'});}catch(e){}try{best.click();}catch(e){}}}finally{busy=false;}}",
-            "function start(){setInterval(tick,1200);try{new MutationObserver(function(){tick();}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}catch(e){}tick();}",
+            "function tick(){if(window.__tbTaskPaused){return;}if(busy){return;}busy=true;try{var now=Date.now();if(now-lastClick<MIN_GAP){return;}recent=recent.filter(function(t){return now-t<60000;});if(recent.length>=MAX_PER_MINUTE){return;}var best=target(now);if(!best){return;}last.set(best,now);attempts.set(best,(attempts.get(best)||0)+1);lastClick=now;recent.push(now);try{var br=best.getBoundingClientRect();lastSpot={x:(br.left+br.right)/2,y:(br.top+br.bottom)/2};lastSpotAt=now;}catch(e){}try{best.scrollIntoView({block:'center'});}catch(e){}try{best.click();}catch(e){}try{window.tbTaskHud&&window.tbTaskHud.clicked(label(best));}catch(e){}}finally{busy=false;}}",
+            "function start(){setInterval(tick,1200);var lastScan=0;try{new MutationObserver(function(){var n=Date.now();if(n-lastScan<800){return;}lastScan=n;tick();}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}catch(e){}tick();}",
             "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',start);}else{start();}",
             "})();"
     );

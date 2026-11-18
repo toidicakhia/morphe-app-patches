@@ -86,6 +86,20 @@ public final class TeraboxAdCloser {
     }
 
     /**
+     * True while an ad, or the app's follow-up native ad, covers the task page.
+     * The task clicker pauses itself then, so a second task cannot start another
+     * ad request while one is still playing.
+     */
+    public static boolean isAdOnTop() {
+        final Activity activity = currentActivity();
+        if (activity == null) {
+            return false;
+        }
+        final String name = activity.getClass().getName();
+        return isAdActivity(name) || EXTRA_NATIVE_ACTIVITY.equals(name);
+    }
+
+    /**
      * The app starts its extra native ad from the reward callback, so it is not
      * on top yet when {@link #close()} runs. Poll for it for a few seconds.
      */

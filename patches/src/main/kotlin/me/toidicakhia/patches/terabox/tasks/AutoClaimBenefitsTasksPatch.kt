@@ -20,10 +20,13 @@ private const val TASK_CLICKER = "Lme/toidicakhia/extension/terabox/TeraboxTaskC
 @Suppress("unused")
 val autoClaimBenefitsTasksPatch = bytecodePatch(
     name = "Auto claim Benefits tasks",
-    description = "Injects a clicker into the Benefits/task-center webview: it keeps pressing " +
-        "\"watch ad\", \"claim\" and other reward controls, with a cooldown and without touching " +
-        "purchase, share or uninstall buttons. Use it together with \"Auto reward ads\" so the ad " +
-        "closes itself once watched; the remote page layout can still change at any time.",
+    description = "Injects a clicker into the Benefits/task-center webview that presses the page's " +
+        "own controls by CSS selector: the reward popup button, task card claim/watch actions, the " +
+        "daily check-in button and today's check-in icon. Complete, subscribe/remind and close " +
+        "controls are never touched, and an overlay shows whether it is clicking, waiting for an " +
+        "ad, and which control it pressed. Use it together with \"Auto reward ads\" so the ad " +
+        "closes itself once watched; if the web app renames its classes the clicker stops until " +
+        "it is updated.",
     default = false
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)
