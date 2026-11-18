@@ -3,6 +3,40 @@
   "version": "1.7.2",
   "patches": [
     {
+      "name": "Auto reward ads",
+      "description": "Skips rewarded-video playback. Every rewarded ad request (Benefits task center, download speed-up, video quality, transfer files) reports success and runs the reward callback immediately. Rewards that TeraBox validates on its servers can still be refused. Pair it with \"Spoof signature\" when patching with this bundle only.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.dubox.drive",
+          "name": "TeraBox",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#226DF6",
+          "signatures": [
+            "b75fd2b70084d7e0813b8f74dd74b62ab79b2aa0ce1372331a1841bd88eed993"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.27.5",
+              "versionCodes": {
+                "ARM64_V8A": 702,
+                "ARMEABI_V7A": 702,
+                "X86_64": 702,
+                "X86": 702
+              },
+              "isExperimental": false,
+              "minSdk": 23,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Block Product Ad Banners",
       "description": "Points the product-ad API endpoint at a non-existent path so in-app ad banners are not loaded. Best effort: ads embedded in content responses are not affected.",
       "default": true,
@@ -391,6 +425,40 @@
               },
               "isExperimental": false,
               "minSdk": null,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "Spoof signature",
+      "description": "Makes the re-signed APK report the stock developer certificate and disables Play Integrity token requests, so Google login and TeraBox's anti-cheat accept the patched app. Skip it when patching with another set that already spoofs the signature.",
+      "default": false,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.dubox.drive",
+          "name": "TeraBox",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#226DF6",
+          "signatures": [
+            "b75fd2b70084d7e0813b8f74dd74b62ab79b2aa0ce1372331a1841bd88eed993"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.27.5",
+              "versionCodes": {
+                "ARM64_V8A": 702,
+                "ARMEABI_V7A": 702,
+                "X86_64": 702,
+                "X86": 702
+              },
+              "isExperimental": false,
+              "minSdk": 23,
               "description": null
             }
           ]
