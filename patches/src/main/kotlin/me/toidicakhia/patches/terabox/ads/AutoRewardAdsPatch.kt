@@ -26,11 +26,8 @@ private const val AD_CLOSER = "Lme/toidicakhia/extension/terabox/TeraboxAdCloser
 @Suppress("unused")
 val autoRewardAdsPatch = bytecodePatch(
     name = "Auto reward ads",
-    description = "Lets rewarded videos play normally and closes the ad right after the reward is " +
-        "earned, so ad completion stays server-valid while the end card does not need to be " +
-        "dismissed by hand. Only the ad activity that is on top is finished. The full-screen " +
-        "native ad the app shows afterwards is dismissed too, otherwise the Benefits page never " +
-        "receives its reward callback.",
+    description = "Closes a rewarded video as soon as the reward is granted, plus the native ad " +
+        "that follows, so completion stays server-valid and the Benefits page gets its callback.",
     default = true
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)

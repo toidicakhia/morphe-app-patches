@@ -13,20 +13,17 @@ import me.toidicakhia.patches.terabox.ads.autoRewardAdsPatch
 private const val TASK_CLICKER = "Lme/toidicakhia/extension/terabox/TeraboxTaskClicker;"
 
 /**
- * The task center is a remote FE page, so the click target cannot be hardcoded.
- * The injected script matches controls by their label (watch / claim / earn in
- * several languages), skips destructive ones and presses them one by one.
+ * The task center is an offline FE pack the app downloads, so its class names
+ * are stable per pack version but change between packs. The injected script
+ * targets those selectors only (no label matching), skips destructive controls
+ * and presses them one by one.
  */
 @Suppress("unused")
 val autoClaimBenefitsTasksPatch = bytecodePatch(
     name = "Auto claim Benefits tasks",
-    description = "Injects a clicker into the Benefits/task-center webview that presses the page's " +
-        "own controls by CSS selector: the reward popup button, task card claim/watch actions, the " +
-        "daily check-in button and today's check-in icon. Complete, subscribe/remind and close " +
-        "controls are never touched, and an overlay shows whether it is clicking, waiting for an " +
-        "ad, and which control it pressed. Use it together with \"Auto reward ads\" so the ad " +
-        "closes itself once watched; if the web app renames its classes the clicker stops until " +
-        "it is updated.",
+    description = "Presses the Benefits/task-center controls by CSS selector (rewarded videos, " +
+        "claims, check-in rewards, coin expiry) and shows what it clicked. Complete, subscribe and " +
+        "close controls are skipped; pair it with \"Auto reward ads\".",
     default = false
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)

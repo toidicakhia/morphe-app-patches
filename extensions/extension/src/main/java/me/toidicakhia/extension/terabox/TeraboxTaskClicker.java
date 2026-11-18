@@ -11,11 +11,14 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 /**
- * Keeps the TeraBox task-center page clicking itself.
+ * Keeps the TeraBox task-center and check-in pages clicking themselves.
  *
- * The page is remote, so instead of matching a fixed layout the injected script
- * looks for controls whose label mentions watching/claiming a reward, skips
- * destructive ones, and presses them one by one with a cooldown.
+ * Both pages are offline packs the app downloads, so the injected script
+ * targets their own class names by CSS selector rather than by label: task card
+ * buttons, the featured task card, the reward popups (including the "watch a
+ * video for an extra reward" button) and the check-in calendar. Destructive
+ * controls (complete, subscribe/remind, close, card exchange) are never part of
+ * the list, and every press goes through a cooldown.
  */
 @SuppressWarnings("unused")
 public final class TeraboxTaskClicker {
@@ -182,18 +185,23 @@ public final class TeraboxTaskClicker {
     }
 
     /**
-     * CSS targets are taken from the live `t-taskCenter` bundle of the web app,
-     * in priority order: reward popup button, task card claim, task card
-     * "watch/go", retroactive card entry, daily check-in button, today's
-     * check-in icon and the coin-expiry "watch video" button. The class names
-     * are semantic and not hashed (only the scoped `data-v-*` attributes are),
-     * so nothing is matched by its label anymore. `.complete-btn`,
-     * `.remind-btn` and close buttons are never part of the list.
+     * CSS targets come from the offline packs the app downloads, captured on
+     * 4.27.5. The task center still renders v3 (`.task-card .task-btn` with
+     * `.video-btn`, `.to-do-btn`, a plain `.btn` for a receivable reward and
+     * `.complete-btn` for an exhausted one); the check-in page is v5
+     * (`.sign-in-new`, `.calendar-body .sign-flash`, `.popup-btn` and the
+     * `.popup-bg-box` reward popups). The `is-*` and
+     * `task-section` targets cover the v5 task list when the server switches to
+     * it, and the `.task-top-card` / `.coin-wrap .sign-in` targets cover the v3
+     * page shell. Nothing is matched by its label. `.complete-btn`,
+     * `.is-disabled`, `.notClickable`, `.remind-btn`, close buttons, the
+     * makeup-card rows and the `.toGet` card-exchange link are never pressed:
+     * the first makeup row spends coins on a card.
      */
     private static final String SCRIPT = String.join(" ",
             "(function(){",
             "if(window.__tbTaskClicker){return;}window.__tbTaskClicker=1;",
-            "var TARGETS=['.popup-bg-box .popup-box .btn','.task-card .task-btn .receive-btn','.task-card .task-btn .btn:not(.receive-btn):not(.complete-btn)','.sign-in-box .sub-title .title-left','.sign-in-box .sign-button','.sign-in-box .calendar-body .single .sign-flash','.expire-coin-box .view-video-btn'];",
+            "var TARGETS=['.popup-bg-box .popup-box .video-btn','.popup-bg-box .popup-box .extra-button:not(.video)','.popup-bg-box .popup-box .btn','.popup-btn','.task-card .task-btn .video-btn','.task-card .task-btn .btn.to-do-btn','.task-card .task-btn .btn:not(.video-btn):not(.to-do-btn):not(.complete-btn)','.task-section__top > button:not([disabled])','.task-card > button.is-collect','.task-card > button.is-go','.task-top-card','.welfare-header-getCoinsCard','button.check-in-pill.is-unsigned','.sign-in-new .calendar-body .single .sign-flash','.sign-in-box .calendar-body .single .sign-flash','.sign-in-box .sub-title .title-left','.sign-in-box .sign-button','.expire-coin-box .view-video-btn','.coin-wrap .sign-in'];",
             "var last=new WeakMap(),attempts=new WeakMap(),COOLDOWN=12000,RETRY=60000,MIN_GAP=3000,MAX_PER_MINUTE=10,recent=[],lastSpot=null,lastSpotAt=0;",
             "function label(el){try{var t=el.innerText||el.textContent||'';return (''+t).replace(/\\s+/g,' ').trim();}catch(e){return '';}}",
             "function visible(el){try{var r=el.getBoundingClientRect();if(r.width<4||r.height<4){return false;}var s=window.getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&parseFloat(s.opacity||'1')!==0&&s.pointerEvents!=='none';}catch(e){return false;}}",
