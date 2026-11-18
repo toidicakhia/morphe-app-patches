@@ -26,7 +26,9 @@ tasks {
     register<JavaExec>("generatePatchesList") {
         description = "Build patch with patch list"
 
-        dependsOn(build)
+        // Must not depend on "build": re-running "jar" here overwrites the patches file
+        // after "buildAndroid" has merged classes.dex into it.
+        dependsOn(classes)
 
         classpath = sourceSets["main"].runtimeClasspath + patchListGeneratorClasspath
         mainClass.set("util.PatchListGeneratorKt")
