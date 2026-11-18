@@ -8,53 +8,20 @@ import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.methodCall
 import com.android.tools.smali.dexlib2.AccessFlags
 
-// Obfuscated app-side wrapper around the Mars mediation SDK for rewarded ads.
-private const val REWARD_AD_WRAPPER = "Ldk0/_;"
 private const val REWARD_SHOW_LISTENER =
     "Lcom/mars/united/international/ads/adsource/reward/OnRewardShowListener;"
 
 /**
- * `showAdIfAvailable`: called with the caller's reward listener and returns
- * whether the ad was handed to the mediation SDK.
+ * Proxy listener created by the mediation's `showAdIfAvailable`. Every reward
+ * callback the ad SDK delivers is forwarded through `___()` to the caller.
  */
-internal object RewardAdShowFingerprint : Fingerprint(
-    definingClass = REWARD_AD_WRAPPER,
-    name = "b",
-    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
-    returnType = "Z",
-    parameters = listOf(
-        "Landroidx/fragment/app/FragmentActivity;",
-        REWARD_SHOW_LISTENER,
-        "Ljava/lang/String;",
-        "Ljava/lang/String;",
-        "Ljava/lang/String;",
-    ),
-    filters = listOf(
-        methodCall(definingClass = "Luk0/l;", name = "n"),
-    ),
-)
-
-/** `isAdLoaded`: ad loaded and the placement's remote switch allows showing it. */
-internal object RewardAdReadyFingerprint : Fingerprint(
-    definingClass = REWARD_AD_WRAPPER,
-    name = "_",
-    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
-    returnType = "Z",
-    parameters = emptyList(),
-    filters = listOf(
-        methodCall(definingClass = "Lkotlin/jvm/functions/Function0;", name = "invoke"),
-    ),
-)
-
-/** `isAdReady`: loaded and at least one mediation source reports it can show. */
-internal object RewardAdShowableFingerprint : Fingerprint(
-    definingClass = REWARD_AD_WRAPPER,
+internal object RewardEarnedFingerprint : Fingerprint(
+    definingClass = "Luk0/l\$__;",
     name = "___",
-    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
-    returnType = "Z",
+    accessFlags = listOf(AccessFlags.PUBLIC),
+    returnType = "V",
     parameters = emptyList(),
     filters = listOf(
-        methodCall(definingClass = REWARD_AD_WRAPPER, name = "_"),
-        methodCall(definingClass = "Luk0/l;", name = "h"),
+        methodCall(definingClass = REWARD_SHOW_LISTENER, name = "___"),
     ),
 )

@@ -4,49 +4,56 @@
  */
 package me.toidicakhia.patches.terabox.ads
 
-import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
+import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.util.getReference
 import app.morphe.patcher.util.matchSingle
-import app.morphe.patcher.util.returnEarly
+import app.morphe.util.indexOfFirstInstructionOrThrow
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import me.toidicakhia.patches.shared.Constants
 
 private const val REWARD_SHOW_LISTENER =
     "Lcom/mars/united/international/ads/adsource/reward/OnRewardShowListener;"
 
+private const val AD_CLOSER = "Lme/toidicakhia/extension/terabox/TeraboxAdCloser;"
+
 /**
- * The reward callback (`OnRewardShowListener.___`) is what actually unlocks the
- * reward: it writes the privilege locally and answers the Benefits H5 page with
- * `isSuccess`, which then claims the task. Skipping the mediation show call and
- * firing the callback directly makes every rewarded placement finish instantly.
+ * The ad is not faked: it plays, the SDK grants the reward through
+ * `OnRewardShowListener.___` and only then the extension finishes the ad
+ * activity, which would otherwise wait for the user to dismiss the end card.
  */
 @Suppress("unused")
 val autoRewardAdsPatch = bytecodePatch(
     name = "Auto reward ads",
-    description = "Skips rewarded-video playback. Every rewarded ad request (Benefits task center, " +
-        "download speed-up, video quality, transfer files) reports success and runs the reward " +
-        "callback immediately. Rewards that TeraBox validates on its servers can still be refused. " +
-        "Pair it with \"Spoof signature\" when patching with this bundle only.",
+    description = "Lets rewarded videos play normally and closes the ad right after the reward is " +
+        "earned, so ad completion stays server-valid while the end card does not need to be " +
+        "dismissed by hand. Only the ad activity that is on top is finished. The full-screen " +
+        "native ad the app shows afterwards is dismissed too, otherwise the Benefits page never " +
+        "receives its reward callback.",
     default = true
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)
+    extendWith("extensions/extension.mpe")
 
     execute {
-        // Report the placement as loaded and showable so callers take the
-        // "show now" path instead of loading a real ad first.
-        RewardAdReadyFingerprint.matchSingle().method.returnEarly(true)
-        RewardAdShowableFingerprint.matchSingle().method.returnEarly(true)
+        // `___()` is the "user earned reward" callback. The activity is resolved
+        // *before* the callback is forwarded: the Benefits listener starts an
+        // extra native-ad activity from that callback, which would otherwise be
+        // the top activity. The extension keeps a reference to the ad activity
+        // and finishes it after a short delay, so the app's own reward handling
+        // (privilege unlock, H5 `isSuccess` callback) still runs first.
+        val method = RewardEarnedFingerprint.matchSingle().method
+        val callbackIndex = method.indexOfFirstInstructionOrThrow {
+            opcode == Opcode.INVOKE_INTERFACE &&
+                getReference<MethodReference>()?.let { reference ->
+                    reference.definingClass == REWARD_SHOW_LISTENER && reference.name == "___"
+                } == true
+        }
 
-        // Hand control back to the caller with success, after firing the reward
-        // callback the app would normally run when the video completes.
-        RewardAdShowFingerprint.matchSingle().method.addInstructions(
-            0,
-            """
-                if-eqz p2, :reward_done
-                invoke-interface {p2}, $REWARD_SHOW_LISTENER->___()V
-                :reward_done
-                const/4 v0, 0x1
-                return v0
-            """.trimIndent()
+        method.addInstruction(
+            callbackIndex,
+            "invoke-static {}, $AD_CLOSER->close()V"
         )
     }
 }
