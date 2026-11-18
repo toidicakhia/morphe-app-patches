@@ -2,7 +2,7 @@ group = "me.toidicakhia"
 
 patches {
     about {
-        name = "App Patches"
+        name = "toidicakhia's patches"
         description = "Patches for Android apps, for use with Morphe."
         source = "https://github.com/toidicakhia/morphe-app-patches"
         author = "toidicakhia"
