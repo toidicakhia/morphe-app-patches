@@ -22,8 +22,10 @@ private const val TASK_CLICKER = "Lme/toidicakhia/extension/terabox/TeraboxTaskC
 val autoClaimBenefitsTasksPatch = bytecodePatch(
     name = "Auto claim Benefits tasks",
     description = "Presses the Benefits/task-center controls by CSS selector (rewarded videos, " +
-        "claims, check-in rewards, coin expiry) and shows what it clicked. Complete, subscribe and " +
-        "close controls are skipped; pair it with \"Auto reward ads\".",
+        "claims, check-in rewards, coin expiry) and shows what it clicked. It only presses a control " +
+        "that is visible, on top and unchanged since the last pass, and marks one inert when nothing " +
+        "happens; complete, subscribe and card-exchange controls are skipped. Leaves the check-in " +
+        "page once it is done. Pair it with \"Auto reward ads\".",
     default = false
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)

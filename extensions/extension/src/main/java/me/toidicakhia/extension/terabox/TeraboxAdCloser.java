@@ -41,6 +41,17 @@ public final class TeraboxAdCloser {
     private static final int EXTRA_NATIVE_POLLS = 30;
 
     /**
+     * After the SDK grants a reward the H5 page still has to answer the reward
+     * callback, refresh the task list and mark the task done (the page waits up
+     * to three seconds). Keeping the clicker paused for that whole window stops
+     * it from pressing the same "watch video" button a second time while the
+     * first reward is still being processed.
+     */
+    private static final long REWARD_HOLD_MS = 5000L;
+
+    private static volatile long lastRewardAt = Long.MIN_VALUE;
+
+    /**
      * Activities that can host a rewarded video. These are the ad SDKs declared
      * in the 4.27.5 manifest: the Benefits placement
      * (`ad_placement_reward_h5_wap`) runs through MAX, whose server chain falls
@@ -71,6 +82,7 @@ public final class TeraboxAdCloser {
     }
 
     public static void close() {
+        lastRewardAt = android.os.SystemClock.elapsedRealtime();
         final Activity activity = currentActivity();
         if (activity != null) {
             final String name = activity.getClass().getName();
@@ -97,6 +109,21 @@ public final class TeraboxAdCloser {
         }
         final String name = activity.getClass().getName();
         return isAdActivity(name) || EXTRA_NATIVE_ACTIVITY.equals(name);
+    }
+
+    /** True while the H5 page may still be processing a reward it just received. */
+    public static boolean recentlyRewarded() {
+        return android.os.SystemClock.elapsedRealtime() - lastRewardAt < REWARD_HOLD_MS;
+    }
+
+    /**
+     * True when {@code activity} is the one the user is actually looking at.
+     * A "watch video" task can open another full-screen WebView or a video
+     * player; while that covers the task page, its clicker must not keep
+     * starting tasks in the background.
+     */
+    public static boolean isOnTop(Activity activity) {
+        return activity != null && activity == currentActivity();
     }
 
     /**

@@ -18,8 +18,8 @@ import java.util.WeakHashMap;
 
 /**
  * Small overlay added to the task-center activity that reports what the clicker
- * is doing: whether it is clicking, paused behind an ad, and which control it
- * pressed last.
+ * is doing: whether it is clicking, paused behind an ad, which control it
+ * pressed last, or why it is holding back.
  */
 @SuppressWarnings("unused")
 public final class TeraboxTaskHud {
@@ -73,6 +73,22 @@ public final class TeraboxTaskHud {
             return;
         }
         holder.post(activity, label);
+    }
+
+    static void note(WebView webView, final String reason) {
+        final Activity activity = activity(webView);
+        if (activity == null || reason == null) {
+            return;
+        }
+
+        final Holder holder;
+        synchronized (HOLDERS) {
+            holder = HOLDERS.get(activity);
+        }
+        if (holder == null) {
+            return;
+        }
+        holder.note(activity, reason);
     }
 
     static void hide(WebView webView) {
@@ -194,6 +210,15 @@ public final class TeraboxTaskHud {
                 public void run() {
                     clicks++;
                     task.setText(clicks + " · " + shorten(label));
+                }
+            });
+        }
+
+        void note(Activity activity, final String reason) {
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    task.setText(shorten(reason));
                 }
             });
         }
