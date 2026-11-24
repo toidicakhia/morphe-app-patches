@@ -16,6 +16,7 @@ import android.widget.TextView;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Closes every kind of ad TeraBox 4.29.0 can show.
@@ -90,17 +91,8 @@ public final class TeraboxAdCloser {
 
     private static final String TAG = "TeraboxAdCloser";
 
-    /** Give the app a moment to handle the reward callback before the ad goes away. */
-    private static final long CLOSE_DELAY_MS = 220L;
-
     /** Time a layer gets to react to BACK before the next step. */
     private static final long BACK_GRACE_MS = 160L;
-
-    /** Upper bound on close passes, so a misbehaving SDK cannot loop forever. */
-    private static final int CLOSE_PASS_BUDGET = 16;
-
-    /** Steps a single ad Activity gets (close control, BACK, key event, finish). */
-    private static final int STEPS_PER_LAYER = 6;
 
     /**
      * Close a rewarded ad that never reported a reward after this long. Short
@@ -108,15 +100,6 @@ public final class TeraboxAdCloser {
      * has a chance to deliver the callback.
      */
     private static final long STUCK_AD_TIMEOUT_MS = 75_000L;
-
-    private static final String ACTIVITY_MANAGER = "com.dubox.drive.ActivityLifecycleManager";
-
-    /** The stack and current-activity accessors, by their obfuscated names. */
-    private static final String STACK_METHOD = "____";
-    private static final String CURRENT_METHOD = "______";
-
-    /** Retry reflection at most this often while the class is not resolvable yet. */
-    private static final long REFLECT_RETRY_MS = 5_000L;
 
     /**
      * Full-screen native ad the app shows after a reward (H5 `showNativeADCount`).
@@ -132,9 +115,6 @@ public final class TeraboxAdCloser {
     private static final long EXTRA_NATIVE_POLL_MS = 200L;
 
     private static final int EXTRA_NATIVE_POLLS = 100;
-
-    /** Keep the clicker paused while the H5 answers the reward and refreshes. */
-    private static final long REWARD_HOLD_MS = 2_500L;
 
     private static volatile long lastRewardAt = Long.MIN_VALUE;
 
@@ -220,9 +200,6 @@ public final class TeraboxAdCloser {
             "com.mars.united.international.ads.adsource.interstitial.MentaSplashAdActivity",
     };
 
-    /** Countdown of the splash ads in this build is three to five seconds. */
-    private static final long SPLASH_CLOSE_DELAY_MS = 4_500L;
-
     /**
      * Labels a close/skip control can carry, in every language the app ships.
      * Resource id names are matched separately and take priority.
@@ -233,7 +210,7 @@ public final class TeraboxAdCloser {
             "关闭", "跳过", "跳過", "略過",
             "閉じる", "スキップ", "닫기", "건너뛰기",
             "cerrar", "saltar", "omitir",
-            "fechar", "pular", "fechar",
+            "fechar", "pular",
             "fermer", "passer", "ignorer",
             "schließen", "überspringen", "weiter",
             "chiudere", "salta",
@@ -320,10 +297,11 @@ public final class TeraboxAdCloser {
         }
         Log.i(TAG, "Splash ad shown: " + name);
         adSince = SystemClock.elapsedRealtime();
+        // The countdown of the splash ads in this build is three to five seconds.
         MAIN.postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (activity.isFinishing() || activity.isDestroyed() || !isOnTop(activity)) {
+                if (isGone(activity) || !isOnTop(activity)) {
                     return;
                 }
                 Log.i(TAG, "Closing the splash ad");
@@ -337,7 +315,7 @@ public final class TeraboxAdCloser {
                     }
                 }, BACK_GRACE_MS * 4);
             }
-        }, SPLASH_CLOSE_DELAY_MS);
+        }, 4_500L);
     }
 
     /** Called from the injected reward callback, before the app handles it. */
@@ -348,7 +326,8 @@ public final class TeraboxAdCloser {
         // The app starts its extra native ad from the reward callback, so it is
         // not on top yet; poll for it while the player is being closed.
         watchExtraNativeAd();
-        startClose(false, CLOSE_DELAY_MS);
+        // Give the app a moment to handle the reward callback before the ad goes away.
+        startClose(false, 220L);
     }
 
     /**
@@ -390,7 +369,8 @@ public final class TeraboxAdCloser {
             }
             return;
         }
-        if (passes >= CLOSE_PASS_BUDGET) {
+        // Upper bound on close passes, so a misbehaving SDK cannot loop forever.
+        if (passes >= 16) {
             Log.w(TAG, "Stopping the ad close after " + passes + " passes");
             closing = false;
             return;
@@ -400,7 +380,9 @@ public final class TeraboxAdCloser {
         // signal to escalate, a different one means a new layer to unwind.
         final boolean sameLayer = top == layer;
         final int step = sameLayer ? layerStep : 0;
-        if (!force && step >= STEPS_PER_LAYER) {
+        // Close control, BACK, key event, then finish: a layer that survives
+        // six of those is left alone instead of being fought over.
+        if (!force && step >= 6) {
             Log.w(TAG, "Ad ignored BACK and finish: " + top.getClass().getName());
             closing = false;
             return;
@@ -469,7 +451,7 @@ public final class TeraboxAdCloser {
      */
     public static boolean isAdOnTop() {
         for (Activity activity : activities()) {
-            if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            if (isGone(activity)) {
                 continue;
             }
             if (isAdSurface(activity.getClass().getName())) {
@@ -489,7 +471,7 @@ public final class TeraboxAdCloser {
         List<Activity> all = activities();
         for (int i = all.size() - 1; i >= 0; i--) {
             Activity activity = all.get(i);
-            if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            if (isGone(activity)) {
                 continue;
             }
             if (isAdActivity(activity.getClass().getName())) {
@@ -505,8 +487,9 @@ public final class TeraboxAdCloser {
     public static boolean recentlyRewarded() {
         // The sentinel must be checked first: subtracting Long.MIN_VALUE wraps
         // around and would report a fresh reward before any ad ever ran.
+        // 2.5 s keeps the clicker paused while the H5 answers the reward and refreshes.
         return lastRewardAt != Long.MIN_VALUE
-                && SystemClock.elapsedRealtime() - lastRewardAt < REWARD_HOLD_MS;
+                && SystemClock.elapsedRealtime() - lastRewardAt < 2_500L;
     }
 
     /**
@@ -582,7 +565,7 @@ public final class TeraboxAdCloser {
         MAIN.postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (activity.isFinishing() || activity.isDestroyed()) {
+                if (isGone(activity)) {
                     return;
                 }
                 Log.i(TAG, "Closing the follow-up native ad");
@@ -625,12 +608,17 @@ public final class TeraboxAdCloser {
 
     private static void finishQuietly(Activity activity) {
         try {
-            if (!activity.isFinishing() && !activity.isDestroyed()) {
+            if (!isGone(activity)) {
                 activity.finish();
             }
         } catch (Throwable throwable) {
             Log.w(TAG, "Could not finish the ad activity", throwable);
         }
+    }
+
+    /** An Activity that is leaving, or already gone. */
+    private static boolean isGone(Activity activity) {
+        return activity == null || activity.isFinishing() || activity.isDestroyed();
     }
 
     /** Copy of the host's Activity stack, oldest first, top last. */
@@ -671,24 +659,27 @@ public final class TeraboxAdCloser {
         }
     }
 
+    /** The host's obfuscated stack accessor: `____` returns the Activity list. */
     private static Method stackMethod() {
         Method method = stackMethod;
         if (method == null) {
-            return resolve(STACK_METHOD, true);
+            return resolve("____", true);
         }
         return method;
     }
 
+    /** The host's obfuscated current-activity accessor: `______`. */
     private static Method currentMethod() {
         Method method = currentMethod;
         if (method == null) {
-            return resolve(CURRENT_METHOD, false);
+            return resolve("______", false);
         }
         return method;
     }
 
     /**
-     * Resolves one of the host's obfuscated accessors and caches it. The poller
+     * Resolves one of the host's accessors on
+     * {@code com.dubox.drive.ActivityLifecycleManager} and caches it. The poller
      * asks for the stack every 600 ms, so a failed lookup is throttled instead
      * of being retried (and logged) on every call.
      */
@@ -698,7 +689,8 @@ public final class TeraboxAdCloser {
             return null;
         }
         try {
-            Method method = Class.forName(ACTIVITY_MANAGER).getDeclaredMethod(name);
+            Method method = Class.forName("com.dubox.drive.ActivityLifecycleManager")
+                    .getDeclaredMethod(name);
             method.setAccessible(true);
             if (stack) {
                 stackMethod = method;
@@ -707,7 +699,9 @@ public final class TeraboxAdCloser {
             }
             return method;
         } catch (Throwable throwable) {
-            nextResolveAt = now + REFLECT_RETRY_MS;
+            // Retry reflection at most every five seconds while the class is
+            // not resolvable yet.
+            nextResolveAt = now + 5_000L;
             warnReflection(throwable);
             return null;
         }
@@ -784,6 +778,12 @@ public final class TeraboxAdCloser {
         }
     }
 
+    /**
+     * How much a view looks like the ad's close control. A matching resource id
+     * wins over a matching content description, which wins over a matching
+     * label; a control in the top band of the ad adds two, because that is
+     * where the close button sits and the creative fills the rest.
+     */
     private static int closeScore(View view, String idName, int screenHeight) {
         if (!view.isClickable() || !view.isEnabled()) {
             return 0;
@@ -846,7 +846,7 @@ public final class TeraboxAdCloser {
         if (name == null) {
             return false;
         }
-        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        String lower = name.toLowerCase(Locale.ROOT);
         if (lower.contains("count")) {
             return false;
         }
@@ -858,7 +858,7 @@ public final class TeraboxAdCloser {
         if (label == null) {
             return false;
         }
-        String value = label.trim().toLowerCase(java.util.Locale.ROOT);
+        String value = label.trim().toLowerCase(Locale.ROOT);
         if (value.isEmpty() || value.length() > 24) {
             return false;
         }
@@ -875,12 +875,7 @@ public final class TeraboxAdCloser {
     }
 
     private static boolean isSplash(String name) {
-        for (String prefix : SPLASH_ACTIVITY_PREFIXES) {
-            if (name.startsWith(prefix)) {
-                return true;
-            }
-        }
-        return false;
+        return startsWithAny(name, SPLASH_ACTIVITY_PREFIXES);
     }
 
     /** An ad Activity, or the app's follow-up native ad. */
@@ -889,12 +884,12 @@ public final class TeraboxAdCloser {
     }
 
     private static boolean isAdActivity(String name) {
-        for (String excluded : NOT_AD_ACTIVITIES) {
-            if (name.startsWith(excluded)) {
-                return false;
-            }
-        }
-        for (String prefix : AD_ACTIVITY_PREFIXES) {
+        return !startsWithAny(name, NOT_AD_ACTIVITIES)
+                && startsWithAny(name, AD_ACTIVITY_PREFIXES);
+    }
+
+    private static boolean startsWithAny(String name, String[] prefixes) {
+        for (String prefix : prefixes) {
             if (name.startsWith(prefix)) {
                 return true;
             }
