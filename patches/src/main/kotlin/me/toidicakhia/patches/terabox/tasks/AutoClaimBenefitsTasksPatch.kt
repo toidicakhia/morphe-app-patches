@@ -20,11 +20,11 @@ private const val TASK_CLICKER = "Lme/toidicakhia/extension/terabox/TeraboxTaskC
 @Suppress("unused")
 val autoClaimBenefitsTasksPatch = bytecodePatch(
     name = "Auto claim Benefits tasks",
-    description = "Presses the Benefits/task-center controls by CSS selector (watch-ad group, " +
-        "check-in, lucky bag) and shows what it clicked. Skips complete, subscribe, card-exchange " +
-        "and disabled controls, waits for each ad to open instead of starting two, drops an inert " +
-        "control for 45s and retries it, and leaves a task that never completes. Closes the " +
-        "check-in page when done. Pair it with \"Auto reward ads\".",
+    description = "Presses the Benefits/Gold-center controls and shows what it clicked: the daily " +
+        "video chain, claimable rewards, the watch-video task and the check-in pill. Share, save, " +
+        "game and purchase tasks are skipped, as are disabled controls. A control that does " +
+        "nothing is retried later, a task that never completes is left after three tries, and the " +
+        "check-in page closes itself when done. Pair it with \"Auto reward ads\".",
     default = false
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)
