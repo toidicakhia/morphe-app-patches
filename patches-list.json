@@ -20,12 +20,12 @@
           "formFactor": "MOBILE",
           "targets": [
             {
-              "version": "4.28.5",
+              "version": "4.29.0",
               "versionCodes": {
-                "ARM64_V8A": 709,
-                "ARMEABI_V7A": 709,
-                "X86_64": 709,
-                "X86": 709
+                "ARM64_V8A": 710,
+                "ARMEABI_V7A": 710,
+                "X86_64": 710,
+                "X86": 710
               },
               "isExperimental": false,
               "minSdk": 23,
@@ -54,12 +54,12 @@
           "formFactor": "MOBILE",
           "targets": [
             {
-              "version": "4.28.5",
+              "version": "4.29.0",
               "versionCodes": {
-                "ARM64_V8A": 709,
-                "ARMEABI_V7A": 709,
-                "X86_64": 709,
-                "X86": 709
+                "ARM64_V8A": 710,
+                "ARMEABI_V7A": 710,
+                "X86_64": 710,
+                "X86": 710
               },
               "isExperimental": false,
               "minSdk": 23,
@@ -154,12 +154,12 @@
           "formFactor": "MOBILE",
           "targets": [
             {
-              "version": "4.28.5",
+              "version": "4.29.0",
               "versionCodes": {
-                "ARM64_V8A": 709,
-                "ARMEABI_V7A": 709,
-                "X86_64": 709,
-                "X86": 709
+                "ARM64_V8A": 710,
+                "ARMEABI_V7A": 710,
+                "X86_64": 710,
+                "X86": 710
               },
               "isExperimental": false,
               "minSdk": 23,
@@ -518,12 +518,12 @@
           "formFactor": "MOBILE",
           "targets": [
             {
-              "version": "4.28.5",
+              "version": "4.29.0",
               "versionCodes": {
-                "ARM64_V8A": 709,
-                "ARMEABI_V7A": 709,
-                "X86_64": 709,
-                "X86": 709
+                "ARM64_V8A": 710,
+                "ARMEABI_V7A": 710,
+                "X86_64": 710,
+                "X86": 710
               },
               "isExperimental": false,
               "minSdk": 23,

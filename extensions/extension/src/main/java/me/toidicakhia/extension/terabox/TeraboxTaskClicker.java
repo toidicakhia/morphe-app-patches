@@ -285,7 +285,7 @@ public final class TeraboxTaskClicker {
     }
 
     /**
-     * CSS targets come from the offline packs captured on 4.28.5. The order is
+     * CSS targets come from the offline packs captured on 4.29.0. The order is
      * reward popups, check-in, then only the "Xem quảng cáo" / "Watch ads" task
      * group, with the lucky bag last. The five daily tasks share `.btn.go` with
      * the watch-ad task, so their buttons are taken only from that group.

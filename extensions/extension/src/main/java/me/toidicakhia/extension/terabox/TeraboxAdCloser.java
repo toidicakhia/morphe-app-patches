@@ -17,7 +17,7 @@ import java.util.List;
  * The ad plays normally, so the completion reported to the ad network is real;
  * this only removes the end card that waits for a close button.
  *
- * Every rewarded network in TeraBox 4.28.5 presents its ad in an Activity, some
+ * Every rewarded network in TeraBox 4.29.0 presents its ad in an Activity, some
  * stacking browser, landing-page or MRAID Activities on top of the player.
  * Finishing only the top one leaves the player, or the mediator's "showing"
  * state, behind. The whole stack is therefore unwound one layer at a time,
@@ -102,7 +102,7 @@ public final class TeraboxAdCloser {
     private static volatile boolean closing;
 
     /**
-     * Full-screen ad activities taken from the 4.28.5 manifest. The Benefits
+     * Full-screen ad activities taken from the 4.29.0 manifest. The Benefits
      * placement runs through MAX, whose waterfall reaches Mars ADX, Pangle,
      * Meta, Moloco, MBridge, Smaato, Vungle and Bigo as well.
      *
