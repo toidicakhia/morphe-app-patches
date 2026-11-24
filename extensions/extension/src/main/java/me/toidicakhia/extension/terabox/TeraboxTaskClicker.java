@@ -21,10 +21,11 @@ import java.util.WeakHashMap;
  * exchange) are never pressed, and every press goes through a cooldown.
  *
  * A control is pressed only when it is visible, enabled, on screen and not
- * covered by a real modal. A press that changes nothing drops that one control
- * for a minute, never the whole clicker. On the check-in page a real sign-in is
+ * covered by a real modal. A press that changes nothing drops that control for
+ * a while - not forever, because a press that failed during a slow refresh
+ * usually works once the page settles. On the check-in page a real sign-in is
  * detected by today's cell showing an img; once signed and quiet, the page
- * closes through its own `closePage` bridge.
+ * closes through its own `closePage` bridge, with a native fallback.
  */
 @SuppressWarnings("unused")
 public final class TeraboxTaskClicker {
@@ -33,7 +34,7 @@ public final class TeraboxTaskClicker {
 
     private static final long POLL_INTERVAL_MS = 600L;
 
-    private static final int MAX_POLLS = 9000;
+    private static final int MAX_POLLS = 12000;
 
     /** Re-inject the script occasionally as a keepalive; the script is idempotent. */
     private static final int KEEPALIVE_POLLS = 12;
@@ -81,7 +82,7 @@ public final class TeraboxTaskClicker {
         webView.post(new Poller(webView));
     }
 
-    /** Receives the label of the control the injected script just pressed. */
+    /** Receives what the injected script pressed, and its close request. */
     private static final class HudBridge {
 
         private final WeakReference<WebView> webViewRef;
@@ -104,6 +105,18 @@ public final class TeraboxTaskClicker {
             final WebView webView = webViewRef.get();
             if (webView != null) {
                 TeraboxTaskHud.note(webView, reason);
+            }
+        }
+
+        /**
+         * The check-in page could not close itself through its own bridge, so
+         * the host Activity is finished instead.
+         */
+        @JavascriptInterface
+        public void closePage() {
+            final WebView webView = webViewRef.get();
+            if (webView != null) {
+                TeraboxTaskHud.finishPage(webView);
             }
         }
     }
@@ -234,14 +247,17 @@ public final class TeraboxTaskClicker {
             TeraboxTaskHud.status(webView, lastStatus);
         }
 
-        /** Detaches the HUD and never leaves the page paused. */
+        /** Detaches the HUD, stops the script and never leaves the page paused. */
         private void stop(WebView webView) {
             synchronized (ATTACHED) {
                 ATTACHED.remove(webView);
             }
             TeraboxTaskHud.hide(webView);
             TeraboxTaskHud.hideAdOverlay();
-            webView.evaluateJavascript("window.__tbTaskPaused=0;", null);
+            // Clearing the interval matters: a detached WebView keeps its JS
+            // timers alive and would otherwise keep pressing in the background.
+            webView.evaluateJavascript(
+                    "window.__tbTaskPaused=0;window.__tbTaskStop&&window.__tbTaskStop();", null);
         }
 
         private boolean isGone(WebView webView) {
@@ -269,15 +285,19 @@ public final class TeraboxTaskClicker {
     }
 
     /**
-     * CSS targets come from the offline packs captured on 4.27.5. The order is
+     * CSS targets come from the offline packs captured on 4.28.5. The order is
      * reward popups, check-in, then only the "Xem quảng cáo" / "Watch ads" task
      * group, with the lucky bag last. The five daily tasks share `.btn.go` with
      * the watch-ad task, so their buttons are taken only from that group.
      *
-     * The sign-in entry is pressed once per page load. Off-screen controls are
-     * scrolled in once; a real modal at the press point blocks the click. A
-     * press that changes nothing drops that control for a minute. Once the
-     * check-in page is signed and quiet, it closes through `closePage`.
+     * The sign-in entry is pressed at most three times, fifteen seconds apart:
+     * a single press can be swallowed while the page is still settling, but
+     * pressing it on every tick would stack the sign-in popups. Off-screen
+     * controls are scrolled in once; a real modal at the press point blocks the
+     * click. A press that changes nothing drops that control for 45s, and the
+     * list of dropped controls is cleared after 45s without any candidate, so a
+     * failure caused by a slow refresh is retried. Once the check-in page is
+     * signed and quiet, it closes through `closePage`.
      */
     private static final String SCRIPT = String.join(" ",
             "(function(){",
@@ -286,6 +306,7 @@ public final class TeraboxTaskClicker {
             "var WATCH_GROUP='__WATCH_AD_GROUP__';",
             "var WATCH_WORDS=/xem quảng cáo|xem quang cao|quảng cáo|quang cao|watch ad|watch video|advertis|观看广告|看广告|nonton iklan|tonton iklan|ver anuncio|ver anúncio|смотреть рекламу|reklam/i;",
             "var WATCH_SELECTOR='.tc-task-card-v2 .task-btn-wrap .btn.btn-go,.tc-task-card-v2 .task-btn-wrap .btn.btn-collect';",
+            "var AD_TARGETS=[WATCH_GROUP,'.task-top-card','.welfare-header-getCoinsCard','.expire-coin-box .view-video-btn','.tc-lucky-bag__cta:not(.is-completed)','.tc-lb-dialog__cta'];",
             "var TARGETS=[",
             "'.popup-bg-box .popup-box .video-btn:not(.notClickable)',",
             "'.reward-toast .extra-button.video',",
@@ -306,10 +327,11 @@ public final class TeraboxTaskClicker {
             "];",
             "function watchGroup(){var groups;try{groups=document.querySelectorAll('.tc-task-group');}catch(e){return null;}for(var i=0;i<groups.length;i++){var head=groups[i].querySelector('.group-title');if(!head)continue;var text=(''+((head.innerText||head.textContent)||'')).replace(/\\s+/g,' ').trim();if(WATCH_WORDS.test(text))return groups[i];}return null;}",
             "function watchTargets(now,i){var g=watchGroup();if(!g)return [];var list;try{list=g.querySelectorAll(WATCH_SELECTOR);}catch(e){return [];}var out=[];for(var j=0;j<list.length;j++){var el=list[j];if(visible(el)&&enabled(el)&&ready(el,i,now))out.push(el);}return out;}",
+            "function watchDone(){try{var g=watchGroup();if(!g)return false;var list=g.querySelectorAll('.task-btn-wrap .btn');if(!list||!list.length)return false;for(var i=0;i<list.length;i++){if(enabled(list[i]))return false;}return true;}catch(e){return false;}}",
             "var MODALS='.popup-bg-box,.popup-mask,.dialog-mask,.base-popup-mask,.auto-sign-rewards-mask,.continuous-sign-in-popup,.sign-rules,.makeup-card-content,.task-sheet-mask,.record-drawer-mask,.guide-ad-mask,.reward-toast,[role=dialog],.modal';",
             "var LOADERS='.loading-box,.el-m-toast__spinner,.task-card__loading';",
-            "var COOLDOWN=6000,DEAD=60000,MIN_GAP=1000,PER_MIN=10,TICK=500,SETTLE=300,VERIFY=1000,MIN_TICK=200;",
-            "var dead={},lastAt={},lastNote='',noteAt=0,recent=[],scrolled='',pending=null,url=(window.location&&window.location.href)||'',pageAt=Date.now(),loadStart=0,quietSince=0,closed=false,busy=false,lastClick=0,lastSig='',signEntryDone=false,lastRun=0;",
+            "var COOLDOWN=6000,DEAD=45000,BLOCK=1800000,MIN_GAP=1000,PER_MIN=10,TICK=500,SETTLE=300,VERIFY=1500,MIN_TICK=200,AD_GAP=4000,AD_TRIES=3,SIGN_TRIES=3,SIGN_GAP=15000,SIGN_IDLE=8000,CLOSE_TRIES=3,CLOSE_GAP=4000,SWEEP=45000;",
+            "var dead={},blocked={},adTries={},lastAt={},lastNote='',noteAt=0,recent=[],scrolled='',pending=null,url=(window.location&&window.location.href)||'',pageAt=Date.now(),aliveAt=0,loadStart=0,quietSince=0,adGap=0,signAt=0,signTries=0,closeTries=0,closeAt=0,busy=false,lastClick=0,lastSig='',lastRun=0,lastScan=0,timer=0,observer=null;",
             "function label(el){try{return (''+((el.innerText||el.textContent)||'')).replace(/\\s+/g,' ').trim();}catch(e){return '';}}",
             "function cls(el){try{var c=el&&el.className;return ''+((c&&c.baseVal!==undefined)?c.baseVal:c||'');}catch(e){return '';}}",
             "function note(m){try{var n=Date.now();if(m===lastNote&&n-noteAt<5000)return;lastNote=m;noteAt=n;window.tbTaskHud&&window.tbTaskHud.note(m);}catch(e){}}",
@@ -321,41 +343,54 @@ public final class TeraboxTaskClicker {
             "function loading(){try{var n=document.querySelectorAll(LOADERS);for(var i=0;i<n.length;i++){var r=n[i].getBoundingClientRect();if(visible(n[i])&&r.width>=40&&r.height>=40)return true;}}catch(e){}return false;}",
             "function sigOf(){var o=[];for(var i=0;i<TARGETS.length;i++){try{o.push(TARGETS[i]===WATCH_GROUP?watchTargets(Date.now(),i).length:document.querySelectorAll(TARGETS[i]).length);}catch(e){o.push('x');}}return o.join(',');}",
             "function keyOf(el,i){var idx=0,p=el.parentElement;if(p){var s=p.children;for(var k=0;k<s.length;k++){if(s[k]===el){idx=k;break;}}}return i+'#'+idx+'#'+label(el).slice(0,24);}",
-            "function ready(el,i,now){var k=keyOf(el,i);if(dead[k]&&now-dead[k]<DEAD)return false;if(now-(lastAt[k]||0)<COOLDOWN)return false;return true;}",
-            "function pick(now){for(var i=0;i<TARGETS.length;i++){if(TARGETS[i]===SIGN_ENTRY&&signEntryDone)continue;var list;if(TARGETS[i]===WATCH_GROUP){list=watchTargets(now,i);}else{try{list=document.querySelectorAll(TARGETS[i]);}catch(e){continue;}}for(var j=0;j<list.length;j++){var el=list[j];if(!visible(el)||!enabled(el)||!ready(el,i,now))continue;return {el:el,i:i,key:keyOf(el,i)};}}return null;}",
+            "function opensAd(i){return AD_TARGETS.indexOf(TARGETS[i])>=0;}",
+            "function ready(el,i,now){var k=keyOf(el,i);if(blocked[k]&&now-blocked[k]<BLOCK)return false;if(dead[k]&&now-dead[k]<DEAD)return false;if(now-(lastAt[k]||0)<COOLDOWN)return false;if(TARGETS[i]===SIGN_ENTRY&&now-signAt<SIGN_GAP)return false;return true;}",
+            "function pick(now){for(var i=0;i<TARGETS.length;i++){var t=TARGETS[i];if(t===SIGN_ENTRY&&signTries>=SIGN_TRIES)continue;if(t===WATCH_GROUP&&watchDone())continue;var list;if(t===WATCH_GROUP){list=watchTargets(now,i);}else{try{list=document.querySelectorAll(t);}catch(e){continue;}}for(var j=0;j<list.length;j++){var el=list[j];if(!visible(el)||!enabled(el)||!ready(el,i,now))continue;return {el:el,i:i,key:keyOf(el,i)};}}return null;}",
             "function signDone(){try{var href=(window.location&&window.location.href)||'';if(href.indexOf('/taskcenter/signin')<0)return false;if(!document.querySelector('.calendar-body')&&!document.querySelector('.sign-in-box'))return false;var m=document.querySelectorAll(MODALS);for(var i=0;i<m.length;i++){if(visible(m[i]))return false;}if(document.querySelector('.sign-flash'))return false;var cells=document.querySelectorAll('.calendar-body .single');for(var j=0;j<cells.length;j++){if(cells[j].querySelector('img'))return true;}return false;}catch(e){return false;}}",
-            "function closePage(){try{var f=document.createElement('iframe');f.style.display='none';f.src='dubox://page/'+Date.now()+'/closePage?params=%7B%7D';document.documentElement.appendChild(f);setTimeout(function(){try{f.remove();}catch(e){}},1000);}catch(e){}}",
+            "function closePage(){try{var f=document.createElement('iframe');f.style.display='none';f.src='dubox://page/'+Date.now()+'/closePage?params=%7B%7D';document.documentElement.appendChild(f);setTimeout(function(){try{f.remove();}catch(e){}},1000);}catch(e){}try{setTimeout(function(){try{if((document.querySelector('.calendar-body')||document.querySelector('.sign-in-box'))&&window.tbTaskHud&&window.tbTaskHud.closePage)window.tbTaskHud.closePage();}catch(e){}},1800);}catch(e){}}",
             "function tick(){",
             "var href=(window.location&&window.location.href)||'';",
             "if(pending&&(sigOf()!==pending.sig||href!==pending.url))pending=null;",
-            "if(window.__tbTaskPaused){quietSince=0;note('ad on screen, waiting');return;}",
+            "if(window.__tbTaskPaused){pending=null;quietSince=0;note('ad on screen, waiting');return;}",
             "if(busy)return;",
             "var now=Date.now();",
             "if(now-lastRun<MIN_TICK)return;lastRun=now;",
             "busy=true;",
             "try{",
-            "if(href!==url){url=href;pageAt=now;scrolled='';pending=null;quietSince=0;closed=false;}",
-            "if(pending&&now-pending.at>=VERIFY){dead[pending.key]=now;pending=null;note('that control had no effect, skipping it for a minute');}",
+            "if(href!==url){url=href;pageAt=now;scrolled='';pending=null;quietSince=0;aliveAt=0;closeTries=0;closeAt=0;}",
+            "if(document.hidden){note('page is hidden');return;}",
+            "if(pending&&now-pending.at>=(pending.ad?VERIFY*3:VERIFY)){dead[pending.key]=now;pending=null;note('that control had no effect, skipping it for a while');}",
             "if(now-pageAt<SETTLE){note('page just loaded');return;}",
             "var cand=pick(now);",
             "if(!cand&&loading()){if(!loadStart)loadStart=now;if(now-loadStart<3000){note('waiting for the page to finish loading');return;}}",
             "loadStart=0;",
-            "if(!cand){if(!quietSince)quietSince=now;if(!closed&&now-quietSince>=8000&&signDone()){closed=true;closePage();note('check-in complete, closing page');}else note('no matching control on this page');return;}",
+            "if(cand)aliveAt=now;else if(!aliveAt)aliveAt=now;",
+            "if(!cand){",
+            "if(!quietSince)quietSince=now;",
+            "if(now-aliveAt>=SWEEP){dead={};aliveAt=now;note('retrying the controls that failed');return;}",
+            "if(now-quietSince>=SIGN_IDLE&&signDone()&&closeTries<CLOSE_TRIES&&now-closeAt>=CLOSE_GAP){closeTries++;closeAt=now;closePage();note('check-in complete, closing the page');}",
+            "else note('no matching control on this page');",
+            "return;",
+            "}",
             "quietSince=now;",
             "if(!onScreen(cand.el)&&scrolled!==cand.key){scrolled=cand.key;try{cand.el.scrollIntoView({block:'center'});}catch(e){try{cand.el.scrollIntoView();}catch(e2){}}note('scrolling to the control');return;}",
             "scrolled='';",
             "if(covered(cand.el)){note('waiting, a modal is on top');return;}",
+            "var ad=opensAd(cand.i);",
+            "if(ad&&(adTries[cand.key]||0)>=AD_TRIES){blocked[cand.key]=now;note('that task did not complete, leaving it');return;}",
+            "if(ad&&now-adGap<AD_GAP){note('waiting for the last ad to open');return;}",
             "if(now-lastClick<MIN_GAP)return;",
             "recent=recent.filter(function(t){return now-t<60000;});",
             "if(recent.length>=PER_MIN){note('rate limit reached');return;}",
+            "if(ad)adGap=now;",
+            "if(ad)adTries[cand.key]=(adTries[cand.key]||0)+1;",
             "lastAt[cand.key]=now;lastClick=now;recent.push(now);",
-            "if(TARGETS[cand.i]===SIGN_ENTRY)signEntryDone=true;",
-            "pending={key:cand.key,sig:sigOf(),url:href,at:now};",
+            "if(TARGETS[cand.i]===SIGN_ENTRY){signTries++;signAt=now;}",
+            "pending={key:cand.key,ad:ad,sig:sigOf(),url:href,at:now};",
             "try{cand.el.click();}catch(e){}",
             "hud(label(cand.el)||cand.key);",
             "}finally{busy=false;}}",
-            "function start(){lastSig=sigOf();window.__tbTick=function(){lastRun=0;tick();};setInterval(tick,TICK);try{new MutationObserver(function(){var n=Date.now();if(n-lastScan<200)return;lastScan=n;var s=sigOf();if(s!==lastSig){lastSig=s;quietSince=0;scrolled='';}tick();}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','disabled','aria-disabled']});}catch(e){}tick();}",
-            "var lastScan=0;",
+            "function start(){lastSig=sigOf();window.__tbTick=function(){lastRun=0;tick();};window.__tbTaskStop=function(){try{clearInterval(timer);}catch(e){}try{if(observer)observer.disconnect();}catch(e){}window.__tbTaskClicker=0;};timer=setInterval(tick,TICK);try{observer=new MutationObserver(function(){var n=Date.now();if(n-lastScan<200)return;lastScan=n;if(document.hidden)return;var s=sigOf();if(s!==lastSig){lastSig=s;quietSince=0;scrolled='';}tick();});observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','disabled','aria-disabled']});}catch(e){}tick();}",
             "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',start);}else{start();}",
             "})();"
     );

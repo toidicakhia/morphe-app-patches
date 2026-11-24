@@ -27,7 +27,9 @@ private const val AD_CLOSER = "Lme/toidicakhia/extension/terabox/TeraboxAdCloser
 val autoRewardAdsPatch = bytecodePatch(
     name = "Auto reward ads",
     description = "Closes a rewarded video as soon as the reward is granted, plus the native ad " +
-        "that follows, so completion stays server-valid and the Benefits page gets its callback.",
+        "that follows, so completion stays server-valid and the Benefits page gets its callback. " +
+        "Every ad layer is unwound top-down through its own close path, and an ad that never " +
+        "reports a reward is closed after 75s.",
     default = true
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)

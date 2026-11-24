@@ -19,10 +19,17 @@ import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Overlays for the task automation: a status card on the task-center activity
  * and a small pill on the ad activity that covers it.
+ *
+ * The card keeps three lines so the two kinds of feedback never overwrite each
+ * other: the current state ("clicking", "watching ad"), the control that was
+ * pressed last, and - when the clicker is idle - the reason it is waiting.
+ * Presses are counted across activities, because the task center is recreated
+ * often enough that a per-Activity counter would keep restarting at 1.
  */
 @SuppressWarnings("unused")
 public final class TeraboxTaskHud {
@@ -31,9 +38,17 @@ public final class TeraboxTaskHud {
 
     private static final int ACCENT = 0xFF7BE3A1;
 
+    /** Used while the clicker is deliberately idle (ad on screen, rate limit). */
+    private static final int ACCENT_WAIT = 0xFFE8C46A;
+
     private static final int TEXT = 0xFFEDEFF2;
 
+    private static final int MUTED = 0xFF9BA5AF;
+
     private static final int MAX_LABEL_LENGTH = 60;
+
+    /** Presses made by the automation in this process. */
+    private static final AtomicInteger PRESSES = new AtomicInteger();
 
     private static final Map<Activity, Holder> HOLDERS =
             Collections.synchronizedMap(new WeakHashMap<Activity, Holder>());
@@ -91,6 +106,37 @@ public final class TeraboxTaskHud {
         if (holder != null) {
             holder.detach();
         }
+    }
+
+    /**
+     * Fallback close for the check-in page, used when its own {@code closePage}
+     * bridge does not answer. Only the sign-in page may be finished: it is a
+     * dedicated page, while the task center itself is not.
+     */
+    static void finishPage(final WebView webView) {
+        if (webView == null) {
+            return;
+        }
+        final Activity activity = activityOf(webView);
+        if (activity == null) {
+            return;
+        }
+        MAIN.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String url = webView.getUrl();
+                    if (url == null || !url.toLowerCase().contains("taskcenter/signin")) {
+                        return;
+                    }
+                    if (!activity.isFinishing() && !activity.isDestroyed()) {
+                        activity.finish();
+                    }
+                } catch (Throwable ignored) {
+                    // The page (or its activity) can go away in between.
+                }
+            }
+        });
     }
 
     /** The holder of an activity, created and registered only when asked. */
@@ -241,18 +287,26 @@ public final class TeraboxTaskHud {
 
         private final TextView title;
 
-        private final TextView task;
+        private final TextView action;
+
+        private final TextView note;
 
         private final FrameLayout.LayoutParams params;
 
-        private int clicks;
+        private String status = "";
 
-        private Holder(LinearLayout root, TextView title, TextView task,
-                      FrameLayout.LayoutParams params) {
+        private String lastAction = "waiting for a task button";
+
+        private String lastNote = "";
+
+        private Holder(LinearLayout root, TextView title, TextView action, TextView note,
+                       FrameLayout.LayoutParams params) {
             this.root = root;
             this.title = title;
-            this.task = task;
+            this.action = action;
+            this.note = note;
             this.params = params;
+            this.action.setText(lastAction);
         }
 
         static Holder create(Activity activity) {
@@ -276,14 +330,18 @@ public final class TeraboxTaskHud {
                 title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
                 title.setTextColor(ACCENT);
                 title.setText("Auto task");
-
-                final TextView task = new TextView(context);
-                task.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-                task.setTextColor(TEXT);
-                task.setText("waiting for a task button");
-
                 root.addView(title);
-                root.addView(task);
+
+                final TextView action = new TextView(context);
+                action.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+                action.setTextColor(TEXT);
+                root.addView(action);
+
+                final TextView note = new TextView(context);
+                note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+                note.setTextColor(MUTED);
+                note.setVisibility(View.GONE);
+                root.addView(note);
 
                 final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -292,33 +350,46 @@ public final class TeraboxTaskHud {
                 params.leftMargin = dp(context, 8);
                 params.topMargin = dp(context, 40);
 
-                return new Holder(root, title, task, params);
+                return new Holder(root, title, action, note, params);
             } catch (Throwable throwable) {
                 return null;
             }
         }
 
+        /**
+         * Re-adds the card when the activity redraws its decor (theme change,
+         * window replacement): a stale parent would otherwise hide it for good.
+         */
         void attachTo(Activity activity) {
-            if (root.getParent() != null) {
-                return;
-            }
             try {
                 final ViewGroup decor = (ViewGroup) activity.getWindow().getDecorView();
+                if (decor == null || root.getParent() == decor) {
+                    return;
+                }
+                removeFromParent(root);
                 decor.addView(root, params);
             } catch (Throwable ignored) {
             }
         }
 
-        void setStatus(String status) {
-            title.setText("Auto task · " + status);
+        void setStatus(String value) {
+            if (value == null || value.equals(status)) {
+                return;
+            }
+            status = value;
+            title.setText("Auto task · " + value);
+            title.setTextColor(isWaiting(value) ? ACCENT_WAIT : ACCENT);
         }
 
         void clicked(final String label) {
             MAIN.post(new Runnable() {
                 @Override
                 public void run() {
-                    clicks++;
-                    task.setText(clicks + " · " + shorten(label));
+                    lastAction = PRESSES.incrementAndGet() + " · " + shorten(label);
+                    action.setText(lastAction);
+                    // A press answers the previous wait reason.
+                    lastNote = "";
+                    note.setVisibility(View.GONE);
                 }
             });
         }
@@ -327,19 +398,28 @@ public final class TeraboxTaskHud {
             MAIN.post(new Runnable() {
                 @Override
                 public void run() {
-                    task.setText(shorten(reason));
+                    final String value = shorten(reason);
+                    if (value.equals(lastNote)) {
+                        return;
+                    }
+                    lastNote = value;
+                    note.setText(value);
+                    note.setVisibility(value.isEmpty() ? View.GONE : View.VISIBLE);
                 }
             });
         }
 
         void detach() {
-            try {
-                final ViewGroup parent = (ViewGroup) root.getParent();
-                if (parent != null) {
-                    parent.removeView(root);
-                }
-            } catch (Throwable ignored) {
-            }
+            removeFromParent(root);
+        }
+
+        /** States where nothing is being pressed on purpose. */
+        private static boolean isWaiting(String value) {
+            return value.startsWith("watching")
+                    || value.startsWith("waiting")
+                    || value.startsWith("reward received")
+                    || value.startsWith("rate limit")
+                    || value.startsWith("no matching control");
         }
 
         private static String shorten(String label) {

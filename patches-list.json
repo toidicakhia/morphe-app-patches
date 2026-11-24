@@ -4,7 +4,7 @@
   "patches": [
     {
       "name": "Auto claim Benefits tasks",
-      "description": "Presses the Benefits/task-center controls by CSS selector (watch-ad group, check-in, lucky bag) and shows what it clicked. Skips complete, subscribe, card-exchange and disabled controls, and drops an inert one for a minute. Closes the check-in page when done. Pair it with \"Auto reward ads\".",
+      "description": "Presses the Benefits/task-center controls by CSS selector (watch-ad group, check-in, lucky bag) and shows what it clicked. Skips complete, subscribe, card-exchange and disabled controls, waits for each ad to open instead of starting two, drops an inert control for 45s and retries it, and leaves a task that never completes. Closes the check-in page when done. Pair it with \"Auto reward ads\".",
       "default": false,
       "category": null,
       "compatiblePackages": [
@@ -38,7 +38,7 @@
     },
     {
       "name": "Auto reward ads",
-      "description": "Closes a rewarded video as soon as the reward is granted, plus the native ad that follows, so completion stays server-valid and the Benefits page gets its callback.",
+      "description": "Closes a rewarded video as soon as the reward is granted, plus the native ad that follows, so completion stays server-valid and the Benefits page gets its callback. Every ad layer is unwound top-down through its own close path, and an ad that never reports a reward is closed after 75s.",
       "default": true,
       "category": null,
       "compatiblePackages": [

@@ -22,8 +22,9 @@ val autoClaimBenefitsTasksPatch = bytecodePatch(
     name = "Auto claim Benefits tasks",
     description = "Presses the Benefits/task-center controls by CSS selector (watch-ad group, " +
         "check-in, lucky bag) and shows what it clicked. Skips complete, subscribe, card-exchange " +
-        "and disabled controls, and drops an inert one for a minute. Closes the check-in page when " +
-        "done. Pair it with \"Auto reward ads\".",
+        "and disabled controls, waits for each ad to open instead of starting two, drops an inert " +
+        "control for 45s and retries it, and leaves a task that never completes. Closes the " +
+        "check-in page when done. Pair it with \"Auto reward ads\".",
     default = false
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)
