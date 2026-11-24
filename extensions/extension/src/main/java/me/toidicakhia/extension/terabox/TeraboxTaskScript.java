@@ -48,8 +48,10 @@ final class TeraboxTaskScript {
             "var WATCH_WORDS=/xem video|xem clip|xem quảng cáo|xem quang cao|watch (a |an )?video|watch (a )?clip|watch ad|观看视频|看视频|观看广告|動画|동영상|ver video|assistir|смотреть видео|reklam izle/i;",
             "var BAD_CARD=/chia sẻ|chia se|lưu tệp|luu tep|thợ đào|tho dao|đào vàng|dao vang|mời bạn|moi ban|mua|nạp|nap tien|đổi thẻ|doi the|subscribe|purchase|upgrade|premium|invite|share|save|uninstall|gỡ cài đặt|go cai dat|cài đặt|đánh giá|rate|tải app|download/i;",
 
-            // Targets that spend an ad when pressed.
-            "var AD_TARGETS=[WATCH_GROUP,WATCH_CARD,'button.tc-v2-lucky-bag__cta:not(.is-completed)','.task-top-card','.welfare-header-getCoinsCard','.expire-coin-box .view-video-btn','.tc-lucky-bag__cta:not(.is-completed)','.tc-lb-dialog__cta'];",
+            // Targets that spend an ad when pressed. The closer treats an ad that
+            // follows one of these as owing a reward, so every watch-video control
+            // belongs here.
+            "var AD_TARGETS=[WATCH_GROUP,WATCH_CARD,'button.tc-v2-lucky-bag__cta:not(.is-completed)','.task-top-card','.welfare-header-getCoinsCard','.expire-coin-box .view-video-btn','.tc-lucky-bag__cta:not(.is-completed)','.tc-lb-dialog__cta','.reward-toast .extra-button.video'];",
 
             "var TARGETS=[",
             // Popups first: they cover the page.
@@ -158,6 +160,9 @@ final class TeraboxTaskScript {
             "if(cand.checkIn&&window.tbTaskHud&&window.tbTaskHud.allowCheckIn&&!window.tbTaskHud.allowCheckIn()){note('check-in already pressed');return;}",
             "if(ad)adGap=now;",
             "if(ad)adTries[cand.key]=(adTries[cand.key]||0)+1;",
+            // Tell the closer an ad owes a reward; it closes every other ad
+            // (interstitial, app-open) a few seconds after it appears.
+            "if(ad){try{window.tbTaskHud&&window.tbTaskHud.expectingAd&&window.tbTaskHud.expectingAd();}catch(e){}}",
             "lastAt[cand.key]=now;lastClick=now;recent.push(now);",
             "if(TARGETS[cand.i]===SIGN_ENTRY){signTries++;signAt=now;}",
             "pending={key:cand.key,ad:ad,sig:sigOf(),url:href,at:now};",

@@ -79,7 +79,17 @@ import java.util.Locale;
  * A layer gets a short grace period between steps, and the loop re-reads the
  * stack each pass, so a landing page collapsing onto the player is followed by
  * the player's own close instead of being skipped. Splash ads have no reward to
- * wait for, so they are closed right after their countdown.
+ * wait for, so they are closed right after their countdown, and the app's own
+ * app-open ad is treated the same way.
+ *
+ * <h2>Ads nobody waits for</h2>
+ *
+ * Only a control the clicker pressed spends a reward; the clicker says so
+ * through {@link #expectReward()}. An ad that appears without that (an
+ * interstitial between pages, an app-open ad, a failed fill) is closed a few
+ * seconds after it appears instead of holding the screen until the reward
+ * timeout, and every ad gets its own clock so a reward from the previous one
+ * cannot mask it.
  *
  * The app's follow-up native ad is dismissed the same way: its own
  * {@code onBackPressed()} is what invokes the static {@code onAdClose}
@@ -121,11 +131,35 @@ public final class TeraboxAdCloser {
     /** When the current ad surface appeared; used by the stuck-ad watchdog. */
     private static volatile long adSince = Long.MIN_VALUE;
 
+    /** The ad surface {@link #adSince} belongs to, so a new ad gets a new clock. */
+    private static volatile Activity adSeen;
+
+    /**
+     * End of the window in which an ad is expected to report a reward, set when
+     * the clicker presses a control that spends one.
+     */
+    private static volatile long rewardExpectedUntil = Long.MIN_VALUE;
+
+    /**
+     * End of the window in which an ad counts as the app's own app-open ad,
+     * set when the host Activity that shows it resumes.
+     */
+    private static volatile long appOpenUntil = Long.MIN_VALUE;
+
     /** End of the current follow-up-native-ad watch, so rewards do not stack loops. */
     private static volatile long nativeWatchUntil = Long.MIN_VALUE;
 
     /** True while a close pass is unwinding the stack. */
     private static volatile boolean closing;
+
+    /** When that pass started, so one that never reports back cannot block the next. */
+    private static volatile long closingAt = Long.MIN_VALUE;
+
+    /**
+     * The transparent host the app starts to show a cold/hot app-open ad. The ad
+     * itself is an ordinary ad Activity; this only says "one is coming".
+     */
+    private static final String APP_OPEN_HOST = "com.dubox.drive.ui.ColdAdHelperActivity";
 
     /**
      * Full-screen ad activities taken from the 4.29.0 manifest. The Benefits
@@ -292,19 +326,29 @@ public final class TeraboxAdCloser {
             return;
         }
         final String name = activity.getClass().getName();
-        if (!isSplash(name)) {
+        if (APP_OPEN_HOST.equals(name)) {
+            // The app-open ad has not been started yet; remember that one is
+            // coming so the ad Activity itself is not mistaken for a reward ad.
+            appOpenUntil = SystemClock.elapsedRealtime() + 15_000L;
             return;
         }
-        Log.i(TAG, "Splash ad shown: " + name);
+        if (!isAdSurface(name)) {
+            return;
+        }
+        if (!isSplash(name) && !appOpenAd()) {
+            return;
+        }
+        Log.i(TAG, (isSplash(name) ? "Splash ad shown: " : "App-open ad shown: ") + name);
         adSince = SystemClock.elapsedRealtime();
-        // The countdown of the splash ads in this build is three to five seconds.
+        // The splash countdown in this build is three to five seconds, and the
+        // app-open ad has the same kind of mandatory display time.
         MAIN.postDelayed(new Runnable() {
             @Override
             public void run() {
                 if (isGone(activity) || !isOnTop(activity)) {
                     return;
                 }
-                Log.i(TAG, "Closing the splash ad");
+                Log.i(TAG, "Closing the ad that nobody waits for");
                 if (!dismissAdUi(activity)) {
                     backPress(activity);
                 }
@@ -318,11 +362,22 @@ public final class TeraboxAdCloser {
         }, 4_500L);
     }
 
+    /**
+     * The clicker pressed a control that spends a rewarded ad, so this ad owes a
+     * reward. Until that reward arrives the ad is left alone; without it the
+     * watchdog would treat a rewarded video as an interstitial and cut it short.
+     */
+    public static void expectReward() {
+        rewardExpectedUntil = SystemClock.elapsedRealtime() + 90_000L;
+    }
+
     /** Called from the injected reward callback, before the app handles it. */
     public static void close() {
         lastRewardAt = SystemClock.elapsedRealtime();
         // The reward arrived, so a stuck ad must not be force-closed any more.
         adSince = Long.MIN_VALUE;
+        // Nor is any other ad still expected to report one.
+        rewardExpectedUntil = Long.MIN_VALUE;
         // The app starts its extra native ad from the reward callback, so it is
         // not on top yet; poll for it while the player is being closed.
         watchExtraNativeAd();
@@ -336,10 +391,17 @@ public final class TeraboxAdCloser {
      * would fight over the same Activities.
      */
     private static void startClose(final boolean force, long delayMs) {
+        long now = SystemClock.elapsedRealtime();
         if (closing) {
-            return;
+            // A pass that never reports back would otherwise block every later
+            // ad, which looks exactly like "the closer stopped working".
+            if (now - closingAt < 5_000L) {
+                return;
+            }
+            Log.w(TAG, "The last close pass stopped reporting, starting a new one");
         }
         closing = true;
+        closingAt = now;
         MAIN.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -421,27 +483,68 @@ public final class TeraboxAdCloser {
     }
 
     /**
-     * Some rewarded networks never deliver the reward callback when an ad is
-     * stuck or the mediation waterfall fails. Called from the task poller, this
-     * closes the ad after a generous timeout so the flow cannot hang forever.
+     * Called from the task poller. An ad that owes a reward gets the full
+     * timeout before it is force-closed, while one that nobody asked for - an
+     * interstitial between pages, an app-open ad, a failed fill - is closed a
+     * few seconds after it appears, so it cannot hold the screen.
      */
     public static void watchStuckAd() {
-        if (!isAdOnTop()) {
+        Activity top = currentAdActivity();
+        if (top == null) {
+            // The follow-up native ad is not an SDK ad surface but it holds the
+            // screen just the same.
+            top = findExtraNativeAd();
+        }
+        if (top == null) {
             adSince = Long.MIN_VALUE;
+            adSeen = null;
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        // Guard the sentinel: `now - Long.MIN_VALUE` overflows, which used to
-        // make this branch unreachable for an ad that never rewarded at all.
-        boolean noReward = lastRewardAt == Long.MIN_VALUE
-                || now - lastRewardAt > STUCK_AD_TIMEOUT_MS;
-        if (adSince == Long.MIN_VALUE) {
+        // Every ad gets its own clock: without this, a reward from the previous
+        // ad masked the next one and it was never closed.
+        if (top != adSeen || adSince == Long.MIN_VALUE) {
+            adSeen = top;
             adSince = now;
-        } else if (now - adSince > STUCK_AD_TIMEOUT_MS && noReward) {
-            Log.w(TAG, "Ad did not report a reward, closing it");
-            adSince = Long.MIN_VALUE;
+            return;
+        }
+        // The sentinel must be checked before subtracting: `now - Long.MIN_VALUE`
+        // overflows, which used to make this branch unreachable for an ad that
+        // never rewarded at all.
+        if (lastRewardAt != Long.MIN_VALUE && lastRewardAt >= adSince) {
+            // This ad was rewarded; the close pass runs from close(). Retry only
+            // when that pass did not actually take the ad away, and at most once
+            // every ten seconds so a stubborn ad is not fought over on each poll.
+            // The sentinel is checked before subtracting, as anywhere else here.
+            boolean passIdle = closingAt == Long.MIN_VALUE || now - closingAt > 10_000L;
+            if (now - lastRewardAt > 10_000L && passIdle) {
+                Log.w(TAG, "Ad stayed after its reward, closing it again");
+                startClose(true, 0L);
+            }
+            return;
+        }
+        // No control was pressed for this ad, so it owes no reward: an
+        // interstitial or an app-open ad. A short grace is enough for those,
+        // while a rewarded video keeps the full timeout.
+        long limit = rewardExpected() ? STUCK_AD_TIMEOUT_MS : 6_000L;
+        if (now - adSince > limit) {
+            Log.w(TAG, "Ad did not report a reward after " + (now - adSince) + " ms, closing it");
+            adSince = now;
             startClose(true, 0L);
         }
+    }
+
+    /** True while the clicker is waiting for the reward of the ad it just opened. */
+    private static boolean rewardExpected() {
+        return rewardExpectedUntil != Long.MIN_VALUE
+                && SystemClock.elapsedRealtime() < rewardExpectedUntil;
+    }
+
+    /** True for the app's own app-open ad: it follows the host and owes no reward. */
+    private static boolean appOpenAd() {
+        return appOpenUntil != Long.MIN_VALUE
+                && SystemClock.elapsedRealtime() < appOpenUntil
+                && !rewardExpected();
     }
 
     /**

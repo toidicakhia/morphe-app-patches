@@ -126,6 +126,15 @@ public final class TeraboxTaskClicker {
         }
 
         /**
+         * The script is about to press a control that spends a rewarded ad, so
+         * the closer must not treat that ad as an interstitial and cut it short.
+         */
+        @JavascriptInterface
+        public void expectingAd() {
+            TeraboxAdCloser.expectReward();
+        }
+
+        /**
          * The check-in page could not close itself through its own bridge, so
          * the host Activity is finished instead.
          */

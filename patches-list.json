@@ -38,7 +38,7 @@
     },
     {
       "name": "Auto reward ads",
-      "description": "Closes a rewarded video as soon as the reward is granted, plus the native ad that follows, so completion stays server-valid and the Benefits page gets its callback. Each network is closed through its own close/skip control first, then BACK, then finish, splash ads are closed after their countdown, and an ad that never reports a reward is closed after 75s.",
+      "description": "Closes a rewarded video as soon as the reward is granted, plus the native ad that follows, so completion stays server-valid and the Benefits page gets its callback. Each network is closed through its own close/skip control first, then BACK, then finish; splash ads are closed after their countdown, an ad no task asked for (interstitial, app-open) after a few seconds, and a rewarded ad that never reports a reward after 75s.",
       "default": true,
       "category": null,
       "compatiblePackages": [
