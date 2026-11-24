@@ -8,6 +8,7 @@ import android.webkit.WebView;
 
 import java.lang.ref.WeakReference;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -16,51 +17,32 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Keeps the TeraBox task-center, Gold-center and check-in pages clicking
  * themselves.
  *
- * The pages are offline packs the app downloads and runs in a WebView, and the
- * pack is replaced whenever the app changes its task-center layout. Two layouts
- * are in the wild at the same time (the server A/B tests them), so the script
- * carries both:
+ * This class is the policy: when to inject, when to pause, and how the page and
+ * the HUD are kept in sync. The script itself lives in {@link TeraboxTaskScript}
+ * because it is page knowledge, not app glue.
  *
- * <ul>
- *   <li>the 4.29 "Gold center" (<code>taskcenter-v2</code>): the eight-step
- *       video chain <code>.tc-v2-lucky-bag__cta</code>, the daily cards
- *       <code>.tc-task-card-v2</code> whose buttons are <code>.btn.btn-go</code>
- *       ("Đi") and <code>.btn.btn-collect</code> ("Nhận"), and the header pill
- *       <code>.check-in-pill.is-unsigned</code>,</li>
- *   <li>the older offline pack: the watch-ad task group, the featured card, the
- *       lucky bag and the check-in calendar.</li>
- * </ul>
- *
- * The old pack grouped tasks under a heading that said "watch ads", so the
- * clicker could take every `.btn.go` in that group. The new pack groups them
- * as "Nhận Gold" and mixes share/save/game tasks in, so the daily rows are
- * matched by their own text: only a card that talks about watching a video is
- * pressed, and only its "Đi" button.
- *
- * A control is pressed only when it is visible, enabled, on screen and not
- * covered by a real modal. A press that changes nothing drops that control for
- * a while - not forever, because a press that failed during a slow refresh
- * usually works once the page settles. The check-in pill is pressed at most
- * three times per app run, because it navigates away from the page.
+ * The clicker runs while the page is in front. It pauses when an ad covers it,
+ * when another Activity (a video player, a full-screen page) is on top, and
+ * while the H5 answers a reward. Each pause is mirrored to the page as
+ * {@code window.__tbTaskPaused}, which the script re-reads on every tick.
  */
 @SuppressWarnings("unused")
 public final class TeraboxTaskClicker {
 
     private static final String TAG = "TeraboxTaskClicker";
 
-    private static final long POLL_INTERVAL_MS = 600L;
-
-    private static final int MAX_POLLS = 12000;
-
-    /** Re-inject the script occasionally as a keepalive; the script is idempotent. */
-    private static final int KEEPALIVE_POLLS = 12;
+    /**
+     * The check-in pill navigates away, so it is not pressed on every tick.
+     * Read by both the counter and its preview, so it stays named.
+     */
+    private static final int MAX_CHECK_IN_PRESSES = 3;
 
     /**
-     * Pages that can host the reward task list. The new Gold center lives at
+     * Pages that can host the reward task list. The Gold center lives at
      * `/wap/commercial/taskcenter` and `/wap/commercial/pointcenter`, the
      * check-in at `/wap/taskcenter/signin`; older builds used other paths.
      */
-    private static final String[] TASK_PAGE_HINTS = {
+    private static final String[] PAGE_URL_HINTS = {
             "taskcenter",
             "pointcenter",
             "benefit",
@@ -74,12 +56,6 @@ public final class TeraboxTaskClicker {
 
     private static final Map<WebView, Boolean> ATTACHED =
             Collections.synchronizedMap(new WeakHashMap<WebView, Boolean>());
-
-    /** Name of the bridge the injected script uses to report what it pressed. */
-    private static final String HUD_BRIDGE = "tbTaskHud";
-
-    /** The check-in pill navigates away, so it is not pressed on every tick. */
-    private static final int MAX_CHECK_IN_PRESSES = 3;
 
     private static final AtomicInteger CHECK_IN_PRESSES = new AtomicInteger();
 
@@ -102,7 +78,8 @@ public final class TeraboxTaskClicker {
             ATTACHED.put(webView, Boolean.TRUE);
         }
 
-        webView.addJavascriptInterface(new HudBridge(webView), HUD_BRIDGE);
+        // The injected script reports presses through this name.
+        webView.addJavascriptInterface(new HudBridge(webView), "tbTaskHud");
         // The closer needs the lifecycle to see splash ads, which run before
         // any task page exists.
         Activity host = TeraboxTaskHud.activityOf(webView);
@@ -112,7 +89,17 @@ public final class TeraboxTaskClicker {
         webView.post(new Poller(webView));
     }
 
-    /** Receives what the injected script pressed, and its close request. */
+    private static boolean isTaskPage(String url) {
+        String lower = url.toLowerCase(Locale.ROOT);
+        for (String hint : PAGE_URL_HINTS) {
+            if (lower.contains(hint)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Receives what the injected script pressed, and its requests. */
     private static final class HudBridge {
 
         private final WeakReference<WebView> webViewRef;
@@ -123,7 +110,7 @@ public final class TeraboxTaskClicker {
 
         @JavascriptInterface
         public void clicked(String label) {
-            final WebView webView = webViewRef.get();
+            WebView webView = webViewRef.get();
             if (webView != null) {
                 TeraboxTaskHud.clicked(webView, label);
             }
@@ -132,7 +119,7 @@ public final class TeraboxTaskClicker {
         /** Why the script is not pressing anything right now. */
         @JavascriptInterface
         public void note(String reason) {
-            final WebView webView = webViewRef.get();
+            WebView webView = webViewRef.get();
             if (webView != null) {
                 TeraboxTaskHud.note(webView, reason);
             }
@@ -144,7 +131,7 @@ public final class TeraboxTaskClicker {
          */
         @JavascriptInterface
         public void closePage() {
-            final WebView webView = webViewRef.get();
+            WebView webView = webViewRef.get();
             if (webView != null) {
                 TeraboxTaskHud.finishPage(webView);
             }
@@ -155,8 +142,12 @@ public final class TeraboxTaskClicker {
          * on every navigation, so this has to live on the Java side.
          */
         @JavascriptInterface
-        public boolean allowCheckIn() {
-            return CHECK_IN_PRESSES.incrementAndGet() <= MAX_CHECK_IN_PRESSES;
+        public synchronized boolean allowCheckIn() {
+            if (CHECK_IN_PRESSES.get() >= MAX_CHECK_IN_PRESSES) {
+                return false;
+            }
+            CHECK_IN_PRESSES.incrementAndGet();
+            return true;
         }
 
         /** Same limit, without consuming one of the presses. */
@@ -172,27 +163,28 @@ public final class TeraboxTaskClicker {
         }
     }
 
+    /** Per-WebView poll loop: keeps the page injected and the HUD current. */
     private static final class Poller implements Runnable {
 
         private final WeakReference<WebView> webViewRef;
 
-        private boolean wasAttached;
-
         private int polls;
 
-        private int lastUrlHash;
+        private int pollsSinceInjection;
 
-        private boolean paused;
+        /** Hash of the URL the script was injected for. */
+        private String injectedUrl;
 
-        private String lastStatus = "";
-
-        /** Set only once an ad has actually covered this page. */
-        private boolean sawAd;
+        /** Set once the WebView has been attached, so a detach is final. */
+        private boolean attachedOnce;
 
         /** The script is injected once per URL, not on every poll. */
         private boolean injected;
 
-        private int pollsSinceInject;
+        private TeraboxTaskHud.State state = TeraboxTaskHud.State.CLICKING;
+
+        /** Set only once an ad has actually covered this page. */
+        private boolean sawAd;
 
         Poller(WebView webView) {
             this.webViewRef = new WeakReference<>(webView);
@@ -212,17 +204,18 @@ public final class TeraboxTaskClicker {
                 Log.w(TAG, "Could not inject the task clicker", throwable);
             }
 
-            if (++polls >= MAX_POLLS || isGone(webView)) {
+            // Ten minutes of polling at 600 ms per turn.
+            if (++polls >= 12_000 || isGone(webView)) {
                 stop(webView);
                 return;
             }
 
-            webView.postDelayed(this, POLL_INTERVAL_MS);
+            webView.postDelayed(this, 600L);
         }
 
         /**
-         * Pauses the page while an ad is in flight and mirrors the state on the
-         * ad window, which covers this WebView and its HUD.
+         * Works out why the clicker should be idle and mirrors that to the page
+         * and to the pill shown on the ad window.
          */
         private void syncState(WebView webView) {
             boolean adOnTop = TeraboxAdCloser.isAdOnTop();
@@ -231,6 +224,7 @@ public final class TeraboxTaskClicker {
             TeraboxAdCloser.watchStuckAd();
             Activity host = TeraboxTaskHud.activityOf(webView);
             boolean otherPage = host != null && !TeraboxAdCloser.isOnTop(host);
+
             // `recentlyRewarded()` is global and can still be true from an ad
             // watched elsewhere. Only honour it here after an ad showed on this
             // page, otherwise opening Benefits right after a reward reports
@@ -241,29 +235,32 @@ public final class TeraboxTaskClicker {
                 sawAd = false;
             }
             boolean holding = sawAd && TeraboxAdCloser.recentlyRewarded();
-            boolean pauseNow = adOnTop || otherPage || holding;
-            String status = adOnTop ? "watching ad"
-                    : otherPage ? "waiting for the page"
-                    : holding ? "reward received, waiting" : "clicking";
-            boolean wasPaused = paused;
-            if (pauseNow != paused || !status.equals(lastStatus)) {
-                paused = pauseNow;
-                lastStatus = status;
-                Log.i(TAG, (pauseNow ? "Clicker paused: " : "Clicker resumed: ") + status);
+
+            TeraboxTaskHud.State next = adOnTop ? TeraboxTaskHud.State.WATCHING_AD
+                    : otherPage ? TeraboxTaskHud.State.WAITING_FOR_PAGE
+                    : holding ? TeraboxTaskHud.State.REWARD_WAIT
+                    : TeraboxTaskHud.State.CLICKING;
+            boolean wasPaused = state != TeraboxTaskHud.State.CLICKING;
+            boolean paused = next != TeraboxTaskHud.State.CLICKING;
+            if (next != state) {
+                state = next;
+                Log.i(TAG, (paused ? "Clicker paused: " : "Clicker resumed: ")
+                        + next.label);
             }
+
             // Re-send the pause flag every poll in case the page reloaded; on
             // resume nudge the page instead of waiting for its next heartbeat.
-            if (pauseNow || wasPaused) {
-                String flags = "window.__tbTaskPaused=" + (pauseNow ? "1" : "0") + ";";
-                if (!pauseNow && wasPaused) {
-                    flags = flags + "window.__tbTick&&window.__tbTick();";
+            if (paused || wasPaused) {
+                String flags = "window.__tbTaskPaused=" + (paused ? "1" : "0") + ";";
+                if (wasPaused && !paused) {
+                    flags += "window.__tbTick&&window.__tbTick();";
                 }
                 webView.evaluateJavascript(flags, null);
             }
 
             Activity adActivity = TeraboxAdCloser.currentAdActivity();
             if (adActivity != null) {
-                TeraboxTaskHud.adOverlay(adActivity, "Auto task · watching ad");
+                TeraboxTaskHud.adOverlay(adActivity);
             } else {
                 TeraboxTaskHud.hideAdOverlay();
             }
@@ -274,28 +271,30 @@ public final class TeraboxTaskClicker {
             String url = webView.getUrl();
             if (url == null || !isTaskPage(url)) {
                 injected = false;
-                pollsSinceInject = 0;
-                if (url != null && url.hashCode() != lastUrlHash) {
-                    lastUrlHash = url.hashCode();
+                pollsSinceInjection = 0;
+                if (url != null && !url.equals(injectedUrl)) {
+                    injectedUrl = url;
                     Log.d(TAG, "Not a task page: " + url);
                 }
                 TeraboxTaskHud.hide(webView);
                 return;
             }
-            if (url.hashCode() != lastUrlHash) {
-                lastUrlHash = url.hashCode();
+
+            if (!url.equals(injectedUrl)) {
+                injectedUrl = url;
                 injected = false;
-                pollsSinceInject = 0;
+                pollsSinceInjection = 0;
                 Log.i(TAG, "Injecting the task clicker into " + url);
             }
+
             // The script guards itself; the keepalive only restarts it after a
             // silent reload that did not change the URL.
-            if (!injected || ++pollsSinceInject >= KEEPALIVE_POLLS) {
-                webView.evaluateJavascript(SCRIPT, null);
+            if (!injected || ++pollsSinceInjection >= 12) {
+                webView.evaluateJavascript(TeraboxTaskScript.SOURCE, null);
                 injected = true;
-                pollsSinceInject = 0;
+                pollsSinceInjection = 0;
             }
-            TeraboxTaskHud.status(webView, lastStatus);
+            TeraboxTaskHud.state(webView, state);
         }
 
         /** Detaches the HUD, stops the script and never leaves the page paused. */
@@ -316,155 +315,12 @@ public final class TeraboxTaskClicker {
                 return false;
             }
             if (webView.isAttachedToWindow()) {
-                wasAttached = true;
+                attachedOnce = true;
                 return false;
             }
             // The fragment may hand the WebView over before it is attached;
             // only treat a detach as final after it has been attached once.
-            return wasAttached;
+            return attachedOnce;
         }
     }
-
-    private static boolean isTaskPage(String url) {
-        String lower = url.toLowerCase();
-        for (String hint : TASK_PAGE_HINTS) {
-            if (lower.contains(hint)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Targets, in press order.
-     *
-     * Popups come first because they cover the page: the prize dialog the
-     * eight-step chain shows after an ad (`.base-popup-btn`), the older
-     * `popup-card` dialog and the reward toast.
-     *
-     * Then the Gold-center controls: a claimable task ("Nhận"), the chain
-     * button ("Xem video (n/m)"), the daily watch-video card ("Đi") and the
-     * header check-in pill. The daily card is matched by its text, not by its
-     * group, because the group now holds share/save/game tasks too.
-     *
-     * The remaining entries are the older pack, kept so a device that is still
-     * served it keeps working.
-     *
-     * A press that changes nothing drops that control for 45s, and the list is
-     * cleared after 45s without any candidate, so a failure caused by a slow
-     * refresh is retried. Once the check-in page is signed and quiet, it closes
-     * through `closePage`, with a native fallback.
-     */
-    private static final String SCRIPT = String.join(" ",
-            "(function(){",
-            "if(window.__tbTaskClicker){return;}window.__tbTaskClicker=1;",
-            // A mis-tapped ad or a task card must not hand the screen to the
-            // store or a browser: that would background TeraBox and pause the
-            // clicker until the user comes back.
-            "try{window.open=function(){note('blocked a web popup');return null;};}catch(e){}",
-            "try{document.addEventListener('click',function(ev){try{var a=ev.target&&ev.target.closest?ev.target.closest('a[href]'):null;if(!a)return;var h=''+(a.getAttribute('href')||'');if(/^market:|^intent:|play\\.google\\.com/i.test(h)){ev.preventDefault();ev.stopPropagation();note('blocked an ad redirect');}}catch(e2){}},true);}catch(e){}",
-            "var SIGN_ENTRY='.coin-wrap .sign-in';",
-            "var CHECK_PILL='button.check-in-pill.is-unsigned';",
-            "var WATCH_GROUP='__WATCH_AD_GROUP__';",
-            "var WATCH_CARD='__WATCH_CARD__';",
-            "var WATCH_WORDS=/xem video|xem clip|xem quảng cáo|xem quang cao|watch (a |an )?video|watch (a )?clip|watch ad|观看视频|看视频|观看广告|動画|동영상|ver video|assistir|смотреть видео|reklam izle/i;",
-            "var BAD_CARD=/chia sẻ|chia se|lưu tệp|luu tep|thợ đào|tho dao|đào vàng|dao vang|mời bạn|moi ban|mua|nạp|nap tien|đổi thẻ|doi the|subscribe|purchase|upgrade|premium|invite|share|save|uninstall|gỡ cài đặt|go cai dat|cài đặt|đánh giá|rate|tải app|download/i;",
-            "var WATCH_SELECTOR='.task-btn-wrap .btn.btn-go,.task-btn-wrap .btn.btn-collect';",
-            "var AD_TARGETS=[WATCH_GROUP,WATCH_CARD,'button.tc-v2-lucky-bag__cta:not(.is-completed)','.task-top-card','.welfare-header-getCoinsCard','.expire-coin-box .view-video-btn','.tc-lucky-bag__cta:not(.is-completed)','.tc-lb-dialog__cta'];",
-            "var TARGETS=[",
-            "'.base-popup-card .base-popup-btn',",
-            "'.popup-card .popup-btn',",
-            "'.popup-bg-box .popup-box .video-btn:not(.notClickable)',",
-            "'.popup-bg-box .popup-box .btn:not(.notClickable)',",
-            "'.popup-btn',",
-            "'.reward-toast .extra-button.video',",
-            "'.reward-toast .extra-button:not(.video)',",
-            "'.tc-task-card-v2 .task-btn-wrap .btn.btn-collect',",
-            "CHECK_PILL,",
-            "'button.tc-v2-lucky-bag__cta:not(.is-completed)',",
-            "WATCH_CARD,",
-            "'.calendar-body .sign-flash',",
-            "SIGN_ENTRY,",
-            "'.sign-in-box .sub-title .title-left',",
-            "'.sign-in-box .sign-button',",
-            "WATCH_GROUP,",
-            "'.task-top-card',",
-            "'.welfare-header-getCoinsCard',",
-            "'.expire-coin-box .view-video-btn',",
-            "'.tc-lucky-bag__cta:not(.is-completed)',",
-            "'.tc-lb-dialog__cta'",
-            "];",
-            "function watchGroup(){var groups;try{groups=document.querySelectorAll('.tc-task-group');}catch(e){return null;}for(var i=0;i<groups.length;i++){var head=groups[i].querySelector('.group-title');if(!head)continue;var text=(''+((head.innerText||head.textContent)||'')).replace(/\\s+/g,' ').trim();if(WATCH_WORDS.test(text))return groups[i];}return null;}",
-            "function watchTargets(now,i){var g=watchGroup();if(!g)return [];var list;try{list=g.querySelectorAll(WATCH_SELECTOR);}catch(e){return [];}var out=[];for(var j=0;j<list.length;j++){var el=list[j];if(visible(el)&&enabled(el)&&ready(el,i,now))out.push(el);}return out;}",
-            "function watchDone(){try{var g=watchGroup();if(!g)return false;var list=g.querySelectorAll('.task-btn-wrap .btn');if(!list||!list.length)return false;for(var i=0;i<list.length;i++){if(enabled(list[i]))return false;}return true;}catch(e){return false;}}",
-            "function watchCardTargets(now,i){var cards;try{cards=document.querySelectorAll('.tc-task-card-v2');}catch(e){return [];}var out=[];for(var j=0;j<cards.length;j++){var card=cards[j];var text=label(card);if(!text||!WATCH_WORDS.test(text)||BAD_CARD.test(text))continue;var btn=card.querySelector('.task-btn-wrap .btn.btn-go');if(!btn)continue;if(visible(btn)&&enabled(btn)&&ready(btn,i,now))out.push(btn);}return out;}",
-            "var MODALS='.popup-bg-box,.popup-mask,.dialog-mask,.base-popup-mask,.base-popup-card,.popup-card,.auto-sign-rewards-mask,.continuous-sign-in-popup,.sign-rules,.makeup-card-content,.task-sheet-mask,.record-drawer-mask,.guide-ad-mask,.reward-toast,.watch-video-popup,.tc-v2-lucky-bag-poll-mask,[role=dialog],.modal';",
-            "var LOADERS='.loading-box,.el-m-toast__spinner,.task-card__loading';",
-            "var COOLDOWN=6000,DEAD=45000,BLOCK=1800000,MIN_GAP=1000,PER_MIN=10,TICK=500,SETTLE=300,VERIFY=1500,MIN_TICK=200,AD_GAP=4000,AD_TRIES=3,SIGN_TRIES=3,SIGN_GAP=15000,SIGN_IDLE=8000,CLOSE_TRIES=3,CLOSE_GAP=4000,SWEEP=45000;",
-            "var dead={},blocked={},adTries={},lastAt={},lastNote='',noteAt=0,recent=[],scrolled='',pending=null,url=(window.location&&window.location.href)||'',pageAt=Date.now(),aliveAt=0,loadStart=0,quietSince=0,adGap=0,signAt=0,signTries=0,closeTries=0,closeAt=0,busy=false,lastClick=0,lastSig='',lastRun=0,lastScan=0,lastDumpAt=0,timer=0,observer=null;",
-            "function label(el){try{return (''+((el.innerText||el.textContent)||'')).replace(/\\s+/g,' ').trim();}catch(e){return '';}}",
-            "function cls(el){try{var c=el&&el.className;return ''+((c&&c.baseVal!==undefined)?c.baseVal:c||'');}catch(e){return '';}}",
-            "function note(m){try{var n=Date.now();if(m===lastNote&&n-noteAt<5000)return;lastNote=m;noteAt=n;window.tbTaskHud&&window.tbTaskHud.note(m);}catch(e){}}",
-            "function hud(t){try{window.tbTaskHud&&window.tbTaskHud.clicked(t);}catch(e){}}",
-            "function visible(el){try{var r=el.getBoundingClientRect();if(r.width<4||r.height<4)return false;var s=window.getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&parseFloat(s.opacity||'1')!==0;}catch(e){return false;}}",
-            "function enabled(el){try{if(el.disabled)return false;if(el.getAttribute&&(el.getAttribute('aria-disabled')==='true'||el.getAttribute('disabled')!==null))return false;if(/disabl|notClickable|is-disabled|is-completed|complete-btn|grey|gray|claimed|received|expired/i.test(cls(el)))return false;if(el.closest&&el.closest('.adx,.adx-two,.notClickable'))return false;if(/mua gói|nap tien|nạp tiền|đăng ký|dang ky|subscribe|purchase|top ?up|recharge|upgrade|đổi thẻ|doi the|exchange|share|chia sẻ|invite|mời bạn|uninstall|gỡ cài đặt/i.test(label(el)))return false;return true;}catch(e){return false;}}",
-            "function onScreen(el){try{var r=el.getBoundingClientRect(),h=window.innerHeight||1e9,w=window.innerWidth||1e9;return r.bottom>0&&r.right>0&&r.top<h&&r.left<w;}catch(e){return false;}}",
-            "function covered(el){try{var r=el.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;if(x<0||y<0||x>(window.innerWidth||1e9)||y>(window.innerHeight||1e9))return false;var top=document.elementFromPoint(x,y);if(!top||top===el||el.contains&&el.contains(top)||top.contains&&top.contains(el))return false;if(top.getAttribute&&top.getAttribute('role')==='dialog')return true;for(var p=top;p&&p!==document.body;p=p.parentElement){if(/popup-bg-box|popup-mask|dialog-mask|base-popup-mask|base-popup-card|popup-card|auto-sign-rewards-mask|continuous-sign-in-popup|sign-rules|makeup-card-content|task-sheet-mask|record-drawer-mask|guide-ad-mask|reward-toast|watch-video-popup|poll-mask/.test(cls(p)))return true;}}catch(e){}return false;}",
-            "function loading(){try{var n=document.querySelectorAll(LOADERS);for(var i=0;i<n.length;i++){var r=n[i].getBoundingClientRect();if(visible(n[i])&&r.width>=40&&r.height>=40)return true;}}catch(e){}return false;}",
-            "function sigOf(){var o=[];for(var i=0;i<TARGETS.length;i++){try{o.push(TARGETS[i]===WATCH_GROUP?watchTargets(Date.now(),i).length:TARGETS[i]===WATCH_CARD?watchCardTargets(Date.now(),i).length:document.querySelectorAll(TARGETS[i]).length);}catch(e){o.push('x');}}return o.join(',');}",
-            "function keyOf(el,i){var idx=0,p=el.parentElement;if(p){var s=p.children;for(var k=0;k<s.length;k++){if(s[k]===el){idx=k;break;}}}return i+'#'+idx+'#'+label(el).slice(0,24);}",
-            "function opensAd(i){return AD_TARGETS.indexOf(TARGETS[i])>=0;}",
-            "function ready(el,i,now){var k=keyOf(el,i);if(blocked[k]&&now-blocked[k]<BLOCK)return false;if(dead[k]&&now-dead[k]<DEAD)return false;if(now-(lastAt[k]||0)<COOLDOWN)return false;if(TARGETS[i]===SIGN_ENTRY&&now-signAt<SIGN_GAP)return false;return true;}",
-            "function pick(now){for(var i=0;i<TARGETS.length;i++){var t=TARGETS[i];if(t===SIGN_ENTRY&&signTries>=SIGN_TRIES)continue;if(t===WATCH_GROUP&&watchDone())continue;if(t===CHECK_PILL&&window.tbTaskHud&&window.tbTaskHud.canCheckIn&&!window.tbTaskHud.canCheckIn())continue;var list;if(t===WATCH_GROUP){list=watchTargets(now,i);}else if(t===WATCH_CARD){list=watchCardTargets(now,i);}else{try{list=document.querySelectorAll(t);}catch(e){continue;}}for(var j=0;j<list.length;j++){var el=list[j];if(!visible(el)||!enabled(el)||!ready(el,i,now))continue;return {el:el,i:i,key:keyOf(el,i),checkIn:t===CHECK_PILL};}}return null;}",
-            "function signDone(){try{var href=(window.location&&window.location.href)||'';if(href.indexOf('signin')<0)return false;var cells=document.querySelectorAll('.calendar-body .single');if(cells.length){if(document.querySelector('.sign-flash'))return false;return true;}if(!document.querySelector('.calendar-body')&&!document.querySelector('.sign-in-box'))return false;var m=document.querySelectorAll(MODALS);for(var i=0;i<m.length;i++){if(visible(m[i]))return false;}if(document.querySelector('.sign-flash'))return false;for(var j=0;j<cells.length;j++){if(cells[j].querySelector('img'))return true;}return false;}catch(e){return false;}}",
-            "function outline(){try{var out=[],sels=['button','div.btn','.tc-task-card-v2','button.tc-v2-lucky-bag__cta','button.check-in-pill','a'],seen={};for(var i=0;i<sels.length;i++){var list=document.querySelectorAll(sels[i]);for(var j=0;j<list.length&&out.length<10;j++){var el=list[j];if(!visible(el))continue;var t=label(el).slice(0,24);if(!t||seen[t])continue;seen[t]=1;out.push(t);}}}catch(e){}return out.join(' | ');}",
-            "function closePage(){try{var f=document.createElement('iframe');f.style.display='none';f.src='dubox://page/'+Date.now()+'/closePage?params=%7B%7D';document.documentElement.appendChild(f);setTimeout(function(){try{f.remove();}catch(e){}},1000);}catch(e){}try{setTimeout(function(){try{if((window.location&&window.location.href||'').indexOf('signin')>=0&&window.history&&window.history.length>1)window.history.back();}catch(e){}},900);}catch(e){}try{setTimeout(function(){try{if((window.location&&window.location.href||'').indexOf('signin')>=0&&window.tbTaskHud&&window.tbTaskHud.closePage)window.tbTaskHud.closePage();}catch(e){}},2600);}catch(e){}}",
-            "function tick(){",
-            "var href=(window.location&&window.location.href)||'';",
-            "if(pending&&(sigOf()!==pending.sig||href!==pending.url))pending=null;",
-            "if(window.__tbTaskPaused){pending=null;quietSince=0;note('ad on screen, waiting');return;}",
-            "if(busy)return;",
-            "var now=Date.now();",
-            "if(now-lastRun<MIN_TICK)return;lastRun=now;",
-            "busy=true;",
-            "try{",
-            "if(href!==url){url=href;pageAt=now;scrolled='';pending=null;quietSince=0;aliveAt=0;closeTries=0;closeAt=0;}",
-            "if(document.hidden){note('page is hidden');return;}",
-            "if(pending&&now-pending.at>=(pending.ad?VERIFY*3:VERIFY)){dead[pending.key]=now;pending=null;note('that control had no effect, skipping it for a while');}",
-            "if(now-pageAt<SETTLE){note('page just loaded');return;}",
-            "var cand=pick(now);",
-            "if(!cand&&loading()){if(!loadStart)loadStart=now;if(now-loadStart<3000){note('waiting for the page to finish loading');return;}}",
-            "loadStart=0;",
-            "if(cand)aliveAt=now;else if(!aliveAt)aliveAt=now;",
-            "if(!cand){",
-            "if(!quietSince)quietSince=now;",
-            "if(now-aliveAt>=SWEEP){dead={};aliveAt=now;note('retrying the controls that failed');return;}",
-            "if(now-quietSince>=SIGN_IDLE&&signDone()&&closeTries<CLOSE_TRIES&&now-closeAt>=CLOSE_GAP){closeTries++;closeAt=now;closePage();note('check-in complete, closing the page');}",
-            "else if(now-lastDumpAt>=15000){lastDumpAt=now;var o=outline();if(o)window.tbTaskHud&&window.tbTaskHud.log&&window.tbTaskHud.log(o);note('no matching control on this page');}",
-            "else note('no matching control on this page');",
-            "return;",
-            "}",
-            "quietSince=now;",
-            "if(!onScreen(cand.el)&&scrolled!==cand.key){scrolled=cand.key;try{cand.el.scrollIntoView({block:'center'});}catch(e){try{cand.el.scrollIntoView();}catch(e2){}}note('scrolling to the control');return;}",
-            "scrolled='';",
-            "if(covered(cand.el)){note('waiting, a modal is on top');return;}",
-            "var ad=opensAd(cand.i);",
-            "if(ad&&(adTries[cand.key]||0)>=AD_TRIES){blocked[cand.key]=now;note('that task did not complete, leaving it');return;}",
-            "if(ad&&now-adGap<AD_GAP){note('waiting for the last ad to open');return;}",
-            "if(now-lastClick<MIN_GAP)return;",
-            "recent=recent.filter(function(t){return now-t<60000;});",
-            "if(recent.length>=PER_MIN){note('rate limit reached');return;}",
-            "if(cand.checkIn&&window.tbTaskHud&&window.tbTaskHud.allowCheckIn&&!window.tbTaskHud.allowCheckIn()){note('check-in already pressed');return;}",
-            "if(ad)adGap=now;",
-            "if(ad)adTries[cand.key]=(adTries[cand.key]||0)+1;",
-            "lastAt[cand.key]=now;lastClick=now;recent.push(now);",
-            "if(TARGETS[cand.i]===SIGN_ENTRY){signTries++;signAt=now;}",
-            "pending={key:cand.key,ad:ad,sig:sigOf(),url:href,at:now};",
-            "try{cand.el.click();}catch(e){}",
-            "hud(label(cand.el)||cand.key);",
-            "}finally{busy=false;}}",
-            "function start(){lastSig=sigOf();window.__tbTick=function(){lastRun=0;tick();};window.__tbTaskStop=function(){try{clearInterval(timer);}catch(e){}try{if(observer)observer.disconnect();}catch(e){}window.__tbTaskClicker=0;};timer=setInterval(tick,TICK);try{observer=new MutationObserver(function(){var n=Date.now();if(n-lastScan<200)return;lastScan=n;if(document.hidden)return;var s=sigOf();if(s!==lastSig){lastSig=s;quietSince=0;scrolled='';}tick();});observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','disabled','aria-disabled']});}catch(e){}tick();}",
-            "if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',start);}else{start();}",
-            "})();"
-    );
 }

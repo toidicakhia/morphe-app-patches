@@ -17,6 +17,7 @@ import android.widget.TextView;
 
 import java.lang.ref.WeakReference;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -38,15 +39,6 @@ public final class TeraboxTaskHud {
 
     private static final int ACCENT = 0xFF7BE3A1;
 
-    /** Used while the clicker is deliberately idle (ad on screen, rate limit). */
-    private static final int ACCENT_WAIT = 0xFFE8C46A;
-
-    private static final int TEXT = 0xFFEDEFF2;
-
-    private static final int MUTED = 0xFF9BA5AF;
-
-    private static final int MAX_LABEL_LENGTH = 60;
-
     /** Presses made by the automation in this process. */
     private static final AtomicInteger PRESSES = new AtomicInteger();
 
@@ -64,17 +56,44 @@ public final class TeraboxTaskHud {
 
     private static TextView adView;
 
+    /**
+     * What the clicker is doing right now. The label is what the card shows,
+     * and {@link #waiting} is what makes it amber: the clicker is idle on
+     * purpose, not stuck.
+     */
+    enum State {
+
+        CLICKING("clicking", false),
+        WATCHING_AD("watching ad", true),
+        WAITING_FOR_PAGE("waiting for the page", true),
+        REWARD_WAIT("reward received", true);
+
+        final String label;
+
+        final boolean waiting;
+
+        State(String label, boolean waiting) {
+            this.label = label;
+            this.waiting = waiting;
+        }
+
+        /** The card title, and the pill text on the ad activity. */
+        String title() {
+            return "Auto task · " + label;
+        }
+    }
+
     private TeraboxTaskHud() {
     }
 
-    static void status(WebView webView, String status) {
+    static void state(WebView webView, State state) {
         final Activity activity = activityOf(webView);
         final Holder holder = holder(activity, true);
         if (holder == null) {
             return;
         }
         holder.attachTo(activity);
-        holder.setStatus(status);
+        holder.setState(state);
     }
 
     static void clicked(WebView webView, final String label) {
@@ -126,7 +145,7 @@ public final class TeraboxTaskHud {
             public void run() {
                 try {
                     String url = webView.getUrl();
-                    if (url == null || !url.toLowerCase().contains("taskcenter/signin")) {
+                    if (url == null || !url.toLowerCase(Locale.ROOT).contains("taskcenter/signin")) {
                         return;
                     }
                     if (!activity.isFinishing() && !activity.isDestroyed()) {
@@ -160,7 +179,8 @@ public final class TeraboxTaskHud {
      * Shows (or keeps) the "watching ad" pill on the Activity that is playing
      * the ad. It is re-added if the ad redraws its decor.
      */
-    static void adOverlay(Activity activity, final String text) {
+    static void adOverlay(Activity activity) {
+        final String text = State.WATCHING_AD.title();
         if (activity == null) {
             return;
         }
@@ -293,7 +313,7 @@ public final class TeraboxTaskHud {
 
         private final FrameLayout.LayoutParams params;
 
-        private String status = "";
+        private State state;
 
         private String lastAction = "waiting for a task button";
 
@@ -334,12 +354,12 @@ public final class TeraboxTaskHud {
 
                 final TextView action = new TextView(context);
                 action.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-                action.setTextColor(TEXT);
+                action.setTextColor(0xFFEDEFF2);
                 root.addView(action);
 
                 final TextView note = new TextView(context);
                 note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-                note.setTextColor(MUTED);
+                note.setTextColor(0xFF9BA5AF);
                 note.setVisibility(View.GONE);
                 root.addView(note);
 
@@ -372,13 +392,13 @@ public final class TeraboxTaskHud {
             }
         }
 
-        void setStatus(String value) {
-            if (value == null || value.equals(status)) {
+        void setState(State value) {
+            if (value == null || value == state) {
                 return;
             }
-            status = value;
-            title.setText("Auto task · " + value);
-            title.setTextColor(isWaiting(value) ? ACCENT_WAIT : ACCENT);
+            state = value;
+            title.setText(value.title());
+            title.setTextColor(value.waiting ? 0xFFE8C46A : ACCENT);
         }
 
         void clicked(final String label) {
@@ -413,19 +433,11 @@ public final class TeraboxTaskHud {
             removeFromParent(root);
         }
 
-        /** States where nothing is being pressed on purpose. */
-        private static boolean isWaiting(String value) {
-            return value.startsWith("watching")
-                    || value.startsWith("waiting")
-                    || value.startsWith("reward received")
-                    || value.startsWith("rate limit")
-                    || value.startsWith("no matching control");
-        }
-
+        /** One line of the card, so a long task label is cut. */
         private static String shorten(String label) {
             final String value = label.replaceAll("\\s+", " ").trim();
-            return value.length() > MAX_LABEL_LENGTH
-                    ? value.substring(0, MAX_LABEL_LENGTH) + "…"
+            return value.length() > 60
+                    ? value.substring(0, 60) + "…"
                     : value;
         }
     }
