@@ -103,6 +103,12 @@ public final class TeraboxTaskClicker {
         }
 
         webView.addJavascriptInterface(new HudBridge(webView), HUD_BRIDGE);
+        // The closer needs the lifecycle to see splash ads, which run before
+        // any task page exists.
+        Activity host = TeraboxTaskHud.activityOf(webView);
+        if (host != null) {
+            TeraboxAdCloser.install(host.getApplication());
+        }
         webView.post(new Poller(webView));
     }
 

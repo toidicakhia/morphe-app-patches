@@ -28,8 +28,9 @@ val autoRewardAdsPatch = bytecodePatch(
     name = "Auto reward ads",
     description = "Closes a rewarded video as soon as the reward is granted, plus the native ad " +
         "that follows, so completion stays server-valid and the Benefits page gets its callback. " +
-        "Every ad layer is unwound top-down through its own close path, and an ad that never " +
-        "reports a reward is closed after 75s.",
+        "Each network is closed through its own close/skip control first, then BACK, then finish, " +
+        "splash ads are closed after their countdown, and an ad that never reports a reward is " +
+        "closed after 75s.",
     default = true
 ) {
     compatibleWith(Constants.TERABOX_COMPATIBILITY)

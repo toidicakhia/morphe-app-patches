@@ -1,38 +1,84 @@
 package me.toidicakhia.extension.terabox;
 
 import android.app.Activity;
+import android.app.Application;
+import android.content.res.Resources;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.TextView;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Closes the rewarded-ad surface once the SDK has granted the reward.
+ * Closes every kind of ad TeraBox 4.29.0 can show.
  *
  * The ad plays normally, so the completion reported to the ad network is real;
  * this only removes the end card that waits for a close button.
  *
- * Every rewarded network in TeraBox 4.29.0 presents its ad in an Activity, some
- * stacking browser, landing-page or MRAID Activities on top of the player.
- * Finishing only the top one leaves the player, or the mediator's "showing"
- * state, behind. The whole stack is therefore unwound one layer at a time,
- * top-down, and each layer is asked to leave the way a user would:
+ * <h2>What is on screen</h2>
+ *
+ * The Benefits placement runs through MAX, whose waterfall reaches the other
+ * networks in this build. Each one presents its ad in its own Activity, and
+ * some stack browser, landing-page or MRAID Activities on top of the player:
+ *
+ * <table>
+ *   <tr><th>Network</th><th>Activities</th><th>How it leaves</th></tr>
+ *   <tr><td>MAX / AppLovin</td><td>adview.AppLovinFullscreenActivity,
+ *       AppLovinFullscreenImmersiveActivity</td>
+ *       <td>own close button, then BACK</td></tr>
+ *   <tr><td>Pangle / ByteDance</td><td>openadsdk.activity.*
+ *       (TTRewardVideo, TTFullScreenVideo, TTAd, landing/playable/website,
+ *       TTDelegate)</td><td>skip/close button after the countdown, then
+ *       BACK for each stacked layer</td></tr>
+ *   <tr><td>Meta</td><td>facebook.ads.AudienceNetworkActivity</td>
+ *       <td>close button, BACK</td></tr>
+ *   <tr><td>AdMob</td><td>gms.ads.AdActivity</td><td>close button, BACK</td></tr>
+ *   <tr><td>Moloco</td><td>Vast, Mraid, StaticAd, FullscreenWebview</td>
+ *       <td>skip button, BACK</td></tr>
+ *   <tr><td>MBridge / Mintegral</td><td>MBRewardVideoActivity,
+ *       MBCommonActivity, LoadingActivity</td>
+ *       <td>mbridge_*_iv_close / mbridge_full_rl_close, BACK</td></tr>
+ *   <tr><td>Smaato</td><td>RewardedInterstitial, InterstitialAd,
+ *       SmaatoSdkBrowser</td><td>smaato_sdk_*_close / skip, BACK</td></tr>
+ *   <tr><td>Vungle / Liftoff</td><td>internal.ui.VungleActivity</td>
+ *       <td>its onBackPressed runs the close callback</td></tr>
+ *   <tr><td>InMobi</td><td>rendering.InMobiAdActivity</td><td>BACK</td></tr>
+ *   <tr><td>Bigo</td><td>ads.api.* (Ad, Companion, Landscape, Popup,
+ *       Landing), ad.splash.*</td><td>bigo_ad_btn_close / _skip, BACK;
+ *       splash closes itself after the countdown</td></tr>
+ *   <tr><td>AdMaster, Vlion, Brandio, PubNative</td>
+ *       <td>*Activity / browser</td><td>BACK</td></tr>
+ *   <tr><td>Mars ADX</td><td>adx.ui.AdxRewardExoVideo, AdxInterstitial*,
+ *       H5Interstitial</td><td>BACK</td></tr>
+ *   <tr><td>TeraBox native ad</td><td>ads.natives.SingleNativeAdSceneActivity</td>
+ *       <td>onBackPressed invokes the static onAdClose the H5 waits for</td></tr>
+ * </table>
+ *
+ * <h2>How it closes</h2>
+ *
+ * Every layer is asked to leave the way a user would, in this order:
  *
  * <ol>
- *   <li>{@code onBackPressed()}: the modern path, and the one the SDK's own
- *       close logic hangs off ({@code onAdClosed}),</li>
+ *   <li>the SDK's own close/skip control ({@link #dismissAdUi}), found by
+ *       resource id name or by its label, so the SDK runs its close path and
+ *       reports {@code onAdClosed} to the mediation,</li>
+ *   <li>{@code onBackPressed()}, the modern path most SDKs hook,</li>
  *   <li>a real BACK key event, for SDKs that only watch key dispatch,</li>
- *   <li>{@code finish()}, for whatever ignored both.</li>
+ *   <li>{@code finish()}, for whatever ignored all of the above.</li>
  * </ol>
  *
  * A layer gets a short grace period between steps, and the loop re-reads the
  * stack each pass, so a landing page collapsing onto the player is followed by
- * the player's own close instead of being skipped.
+ * the player's own close instead of being skipped. Splash ads have no reward to
+ * wait for, so they are closed right after their countdown.
  *
  * The app's follow-up native ad is dismissed the same way: its own
  * {@code onBackPressed()} is what invokes the static {@code onAdClose}
@@ -53,8 +99,8 @@ public final class TeraboxAdCloser {
     /** Upper bound on close passes, so a misbehaving SDK cannot loop forever. */
     private static final int CLOSE_PASS_BUDGET = 16;
 
-    /** Steps a single ad Activity gets (back press, key event, finish, wait). */
-    private static final int STEPS_PER_LAYER = 5;
+    /** Steps a single ad Activity gets (close control, BACK, key event, finish). */
+    private static final int STEPS_PER_LAYER = 6;
 
     /**
      * Close a rewarded ad that never reported a reward after this long. Short
@@ -161,8 +207,41 @@ public final class TeraboxAdCloser {
             "com.google.android.gms.ads.NotificationHandlerActivity",
             "net.pubnative.lite.sdk.consent.UserConsentActivity",
             "net.pubnative.lite.sdk.contentinfo.AdFeedbackActivity",
-            "sg.bigo.ads.ad.splash.",
             "sg.bigo.ads.controller.form.",
+    };
+
+    /**
+     * Splash ads have no reward to wait for: they run a countdown and then wait
+     * for the user to skip. They are closed right after the countdown, which is
+     * also what keeps an app-open ad from holding the whole screen.
+     */
+    private static final String[] SPLASH_ACTIVITY_PREFIXES = {
+            "sg.bigo.ads.ad.splash.",
+            "com.mars.united.international.ads.adsource.interstitial.MentaSplashAdActivity",
+    };
+
+    /** Countdown of the splash ads in this build is three to five seconds. */
+    private static final long SPLASH_CLOSE_DELAY_MS = 4_500L;
+
+    /**
+     * Labels a close/skip control can carry, in every language the app ships.
+     * Resource id names are matched separately and take priority.
+     */
+    private static final String[] CLOSE_WORDS = {
+            "close", "skip", "dismiss", "no thanks", "not now",
+            "đóng", "bỏ qua", "để sau",
+            "关闭", "跳过", "跳過", "略過",
+            "閉じる", "スキップ", "닫기", "건너뛰기",
+            "cerrar", "saltar", "omitir",
+            "fechar", "pular", "fechar",
+            "fermer", "passer", "ignorer",
+            "schließen", "überspringen", "weiter",
+            "chiudere", "salta",
+            "закрыть", "пропустить",
+            "kapat", "atla", "geç",
+            "tutup", "lewati",
+            "ปิด", "ข้าม",
+            "إغلاق", "تخطي",
     };
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -176,7 +255,89 @@ public final class TeraboxAdCloser {
 
     private static volatile boolean reflectionWarned;
 
+    /** Lifecycle callbacks are registered once per process. */
+    private static volatile boolean installed;
+
     private TeraboxAdCloser() {
+    }
+
+    /**
+     * Watches ad Activities for the ones that have no reward to wait for.
+     *
+     * Called from the task clicker, which is the only hook this extension gets
+     * early enough to see an app-open splash ad. Safe to call repeatedly.
+     */
+    public static void install(Application application) {
+        if (application == null || installed) {
+            return;
+        }
+        installed = true;
+        try {
+            application.registerActivityLifecycleCallbacks(
+                    new Application.ActivityLifecycleCallbacks() {
+                        @Override
+                        public void onActivityCreated(Activity activity, Bundle state) {
+                        }
+
+                        @Override
+                        public void onActivityStarted(Activity activity) {
+                        }
+
+                        @Override
+                        public void onActivityResumed(Activity activity) {
+                            onAdShown(activity);
+                        }
+
+                        @Override
+                        public void onActivityPaused(Activity activity) {
+                        }
+
+                        @Override
+                        public void onActivityStopped(Activity activity) {
+                        }
+
+                        @Override
+                        public void onActivitySaveInstanceState(Activity activity, Bundle state) {
+                        }
+
+                        @Override
+                        public void onActivityDestroyed(Activity activity) {
+                        }
+                    });
+        } catch (Throwable throwable) {
+            Log.w(TAG, "Could not watch the activity lifecycle", throwable);
+        }
+    }
+
+    /** Schedules the close of an ad that is not waiting for a reward callback. */
+    private static void onAdShown(final Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        final String name = activity.getClass().getName();
+        if (!isSplash(name)) {
+            return;
+        }
+        Log.i(TAG, "Splash ad shown: " + name);
+        adSince = SystemClock.elapsedRealtime();
+        MAIN.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (activity.isFinishing() || activity.isDestroyed() || !isOnTop(activity)) {
+                    return;
+                }
+                Log.i(TAG, "Closing the splash ad");
+                if (!dismissAdUi(activity)) {
+                    backPress(activity);
+                }
+                MAIN.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        finishQuietly(activity);
+                    }
+                }, BACK_GRACE_MS * 4);
+            }
+        }, SPLASH_CLOSE_DELAY_MS);
     }
 
     /** Called from the injected reward callback, before the app handles it. */
@@ -250,9 +411,16 @@ public final class TeraboxAdCloser {
             Log.i(TAG, "Finishing " + name + " (no reward)");
             finishQuietly(top);
         } else if (step == 0) {
+            // Every network has its own close path; pressing its control keeps
+            // the callback (`onAdClosed`) the mediation waits for.
+            if (!dismissAdUi(top)) {
+                Log.i(TAG, "Back press on " + name);
+                backPress(top);
+            }
+        } else if (step == 1) {
             Log.i(TAG, "Back press on " + name);
             backPress(top);
-        } else if (step == 1) {
+        } else if (step == 2) {
             Log.i(TAG, "Sending BACK to " + name);
             sendBack(top);
         } else {
@@ -551,6 +719,168 @@ public final class TeraboxAdCloser {
         }
         reflectionWarned = true;
         Log.w(TAG, "Could not read the Activity stack", throwable);
+    }
+
+    /**
+     * Finds and presses the SDK's own close/skip control, if the ad shows one.
+     *
+     * The lookups happen on the live view tree, so they also cover the networks
+     * whose resource names are not exported in the app's resource table: the
+     * id name is read from the view itself.
+     */
+    private static boolean dismissAdUi(Activity activity) {
+        try {
+            View decor = activity.getWindow().getDecorView();
+            if (decor == null) {
+                return false;
+            }
+            Resources resources = activity.getResources();
+            Candidate best = new Candidate();
+            scanForClose(decor, resources, decor.getHeight(), best, 0);
+            if (best.view == null) {
+                return false;
+            }
+            Log.i(TAG, "Pressing the ad's close control (" + best.idName + ")");
+            if (best.view.performClick()) {
+                return true;
+            }
+            best.view.callOnClick();
+            return true;
+        } catch (Throwable throwable) {
+            Log.w(TAG, "Could not press the ad's close control", throwable);
+            return false;
+        }
+    }
+
+    /** Highest-scoring close affordance found while walking the tree. */
+    private static final class Candidate {
+
+        private View view;
+
+        private int score;
+
+        private String idName;
+    }
+
+    private static void scanForClose(View view, Resources resources, int screenHeight,
+                                     Candidate best, int depth) {
+        if (view == null || depth > 24 || view.getVisibility() != View.VISIBLE) {
+            return;
+        }
+        if (view.isShown()) {
+            String idName = idNameOf(view, resources);
+            int score = closeScore(view, idName, screenHeight);
+            if (score > best.score) {
+                best.view = view;
+                best.score = score;
+                best.idName = idName;
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = group.getChildCount() - 1; i >= 0; i--) {
+                scanForClose(group.getChildAt(i), resources, screenHeight, best, depth + 1);
+            }
+        }
+    }
+
+    private static int closeScore(View view, String idName, int screenHeight) {
+        if (!view.isClickable() || !view.isEnabled()) {
+            return 0;
+        }
+        int score = 0;
+        if (idName != null && isCloseIdName(idName)) {
+            score = 10;
+        }
+        if (score == 0) {
+            CharSequence description = view.getContentDescription();
+            if (description != null && looksLikeClose(description.toString())) {
+                score = 6;
+            }
+        }
+        if (score == 0 && view instanceof TextView) {
+            CharSequence text = ((TextView) view).getText();
+            if (text != null && looksLikeClose(text.toString())) {
+                score = 4;
+            }
+        }
+        if (score > 0 && isNearTop(view, screenHeight)) {
+            score += 2;
+        }
+        return score;
+    }
+
+    /** Close controls sit in the top band of the ad, the creative fills the rest. */
+    private static boolean isNearTop(View view, int screenHeight) {
+        if (screenHeight <= 0) {
+            return false;
+        }
+        try {
+            int[] location = new int[2];
+            view.getLocationOnScreen(location);
+            return location[1] < screenHeight * 0.4f;
+        } catch (Throwable throwable) {
+            return false;
+        }
+    }
+
+    private static String idNameOf(View view, Resources resources) {
+        try {
+            int id = view.getId();
+            if (id == View.NO_ID || resources == null) {
+                return null;
+            }
+            return resources.getResourceEntryName(id);
+        } catch (Throwable throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * True for the ids every network uses for its close control, e.g.
+     * `mbridge_full_iv_close`, `smaato_sdk_video_skip_button`,
+     * `bigo_ad_btn_close`, `tt_reward_full_skip`. Countdown timers share the
+     * wording but are labels, not buttons, so they are rejected.
+     */
+    static boolean isCloseIdName(String name) {
+        if (name == null) {
+            return false;
+        }
+        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        if (lower.contains("count")) {
+            return false;
+        }
+        return lower.contains("close") || lower.contains("skip") || lower.contains("dismiss");
+    }
+
+    /** True when a short label is a close/skip/dismiss affordance. */
+    static boolean looksLikeClose(String label) {
+        if (label == null) {
+            return false;
+        }
+        String value = label.trim().toLowerCase(java.util.Locale.ROOT);
+        if (value.isEmpty() || value.length() > 24) {
+            return false;
+        }
+        if ("×".equals(value) || "✕".equals(value) || "✖".equals(value) || "✗".equals(value)
+                || "x".equals(value)) {
+            return true;
+        }
+        for (String word : CLOSE_WORDS) {
+            if (value.contains(word)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSplash(String name) {
+        for (String prefix : SPLASH_ACTIVITY_PREFIXES) {
+            if (name.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** An ad Activity, or the app's follow-up native ad. */
