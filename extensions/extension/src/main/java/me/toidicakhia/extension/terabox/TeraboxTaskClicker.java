@@ -358,6 +358,11 @@ public final class TeraboxTaskClicker {
     private static final String SCRIPT = String.join(" ",
             "(function(){",
             "if(window.__tbTaskClicker){return;}window.__tbTaskClicker=1;",
+            // A mis-tapped ad or a task card must not hand the screen to the
+            // store or a browser: that would background TeraBox and pause the
+            // clicker until the user comes back.
+            "try{window.open=function(){note('blocked a web popup');return null;};}catch(e){}",
+            "try{document.addEventListener('click',function(ev){try{var a=ev.target&&ev.target.closest?ev.target.closest('a[href]'):null;if(!a)return;var h=''+(a.getAttribute('href')||'');if(/^market:|^intent:|play\\.google\\.com/i.test(h)){ev.preventDefault();ev.stopPropagation();note('blocked an ad redirect');}}catch(e2){}},true);}catch(e){}",
             "var SIGN_ENTRY='.coin-wrap .sign-in';",
             "var CHECK_PILL='button.check-in-pill.is-unsigned';",
             "var WATCH_GROUP='__WATCH_AD_GROUP__';",

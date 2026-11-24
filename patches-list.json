@@ -105,6 +105,40 @@
       "options": []
     },
     {
+      "name": "Block ad redirects",
+      "description": "Rewrites the Play Store, market: and intent: URLs inside the ad SDKs and stops the hybrid WebView client from handing a page off to the store or a browser, so an auto-opening or mis-tapped ad cannot leave TeraBox and stall the automation.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.dubox.drive",
+          "name": "TeraBox",
+          "description": null,
+          "apkFileType": "APKM",
+          "appIconColor": "#226DF6",
+          "signatures": [
+            "b75fd2b70084d7e0813b8f74dd74b62ab79b2aa0ce1372331a1841bd88eed993"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "4.29.0",
+              "versionCodes": {
+                "ARM64_V8A": 710,
+                "ARMEABI_V7A": 710,
+                "X86_64": 710,
+                "X86": 710
+              },
+              "isExperimental": false,
+              "minSdk": 23,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Bypass SSL pinning",
       "description": "Bypasses EZVIZ certificate pinning and hostname checks so a debugging proxy can read its HTTPS traffic. Also trusts user-installed certificates. Not selected by default.",
       "default": false,
