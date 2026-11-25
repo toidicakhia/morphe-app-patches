@@ -18,7 +18,7 @@ This bundle currently supports:
 | NetMonster | 4.0.5 | Unlock premium |
 | HTTP Sniffer | 2.5.2-ad_mob, 2.4.9-ad_mob | Unlock VIP |
 | VTVGo | 12.11.19 | Remove video/product ads, disable analytics, remove Ad ID permissions |
-| TeraBox | 4.29.0 | Auto reward ads, auto claim tasks, block ad redirects, bypass SSL pinning, spoof signature |
+| TeraBox | 4.29.0 | Bypass SSL pinning |
 
 Only the exact versions listed above are supported. Newer app releases usually need
 updated fingerprints before a patch can be applied.
