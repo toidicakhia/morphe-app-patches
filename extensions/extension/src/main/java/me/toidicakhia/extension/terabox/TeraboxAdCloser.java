@@ -187,11 +187,13 @@ public final class TeraboxAdCloser {
             "com.applovin.sdk.AppLovinWebViewActivity",
             // Pangle / ByteDance: TTRewardVideoActivity, TTFullScreenVideoActivity,
             // TTAdActivity, express players, landing pages and TTDelegateActivity.
-            "com.bytedance.sdk.openadsdk.activity.",
+            // The playable and express components live under other subpackages.
+            "com.bytedance.sdk.openadsdk.",
             // Meta Audience Network (rewarded and interstitial share this one).
             "com.facebook.ads.AudienceNetworkActivity",
-            // AdMob.
-            "com.google.android.gms.ads.AdActivity",
+            // AdMob, including the ad manager and test activities. The consent
+            // and notification handlers are excluded below.
+            "com.google.android.gms.ads.",
             // Moloco: VastActivity, MraidActivity, StaticAdActivity,
             // FullscreenWebviewActivity.
             "com.moloco.",
@@ -201,16 +203,15 @@ public final class TeraboxAdCloser {
             "com.smaato.sdk.",
             // Vungle / Liftoff: VungleActivity extends the SDK's AdActivity.
             "com.vungle.ads.internal.ui.",
-            // InMobi.
-            "com.inmobi.ads.rendering.InMobiAdActivity",
+            // InMobi: every rendering activity, including MRAID and video.
+            "com.inmobi.ads.rendering.",
             // Bigo: ad, companion, landscape, popup, landing and MRAID video.
             "sg.bigo.ads.",
-            // AdMaster.
-            "cc.admaster.android.proxy.api.",
-            // PubNative / Verve.
-            "net.pubnative.lite.sdk.rewarded.",
-            "net.pubnative.lite.sdk.interstitial.",
-            "net.pubnative.lite.sdk.utils.browser.BrowserActivity",
+            // AdMaster, including the MRAID and landing-page activities.
+            "cc.admaster.android.",
+            // PubNative / Verve: rewarded, interstitial, MRAID, VAST and the
+            // in-ad browser.
+            "net.pubnative.lite.sdk.",
             // Mars ADX and the Menta source (also reached directly by the app).
             "com.mars.united.international.ads.adx.",
             "com.mars.united.international.ads.adsource.",
@@ -485,8 +486,29 @@ public final class TeraboxAdCloser {
 
         String name = top.getClass().getName();
         if (force) {
+            if (isExtraNativeAd(top)) {
+                // Its onBackPressed() is what invokes the onAdClose callback
+                // the H5 reward flow waits for; finish() alone skips it.
+                Log.i(TAG, "Closing the follow-up native ad (no reward)");
+                dismissNativeLater(top, 0L);
+                closing = false;
+                return;
+            }
             Log.i(TAG, "Finishing " + name + " (no reward)");
             finishQuietly(top);
+        } else if (isExtraNativeAd(top)) {
+            // BACK first: the native ad's own back handler answers the H5,
+            // then a second pass finishes whatever is left.
+            if (step == 0) {
+                Log.i(TAG, "Back press on the native ad");
+                backPress(top);
+            } else if (step == 1) {
+                Log.i(TAG, "Back press on the native ad");
+                backPress(top);
+            } else {
+                Log.i(TAG, "Finishing the native ad");
+                finishQuietly(top);
+            }
         } else if (step == 0) {
             // Every network has its own close path; pressing its control keeps
             // the callback (`onAdClosed`) the mediation waits for.
@@ -625,8 +647,9 @@ public final class TeraboxAdCloser {
     }
 
     /**
-     * The Activity currently playing an SDK ad, or {@code null}. Used to put
-     * the "watching ad" pill on top of the ad itself.
+     * The Activity currently playing an ad, or the app's follow-up native ad,
+     * or {@code null}. Used to put the "watching ad" pill on top of the ad
+     * itself and to close the topmost ad surface.
      */
     public static Activity currentAdActivity() {
         List<Activity> all = activities();
@@ -635,13 +658,13 @@ public final class TeraboxAdCloser {
             if (isGone(activity)) {
                 continue;
             }
-            if (isAdActivity(activity.getClass().getName())) {
+            if (isAdSurface(activity.getClass().getName())) {
                 return activity;
             }
         }
         // Fallback when the host does not expose its Activity list.
         Activity current = currentActivity();
-        return current != null && isAdActivity(current.getClass().getName()) ? current : null;
+        return current != null && isAdSurface(current.getClass().getName()) ? current : null;
     }
 
     /** True while the H5 page may still be processing a reward it just received. */
@@ -697,6 +720,11 @@ public final class TeraboxAdCloser {
                 }
             }
         }, EXTRA_NATIVE_POLL_MS);
+    }
+
+    /** True for the app's own full-screen native ad scene. */
+    private static boolean isExtraNativeAd(Activity activity) {
+        return activity != null && EXTRA_NATIVE_ACTIVITY.equals(activity.getClass().getName());
     }
 
     /** Finds the app's follow-up native ad anywhere in the stack, not only on top. */
