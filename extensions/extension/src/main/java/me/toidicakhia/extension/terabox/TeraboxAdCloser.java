@@ -9,8 +9,10 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebView;
 import android.widget.TextView;
 
 import java.lang.reflect.Method;
@@ -71,6 +73,8 @@ import java.util.Locale;
  *   <li>the SDK's own close/skip control ({@link #dismissAdUi}), found by
  *       resource id name or by its label, so the SDK runs its close path and
  *       reports {@code onAdClosed} to the mediation,</li>
+ *   <li>a real tap on the close X in the top-right corner, for playable and
+ *       end-card creatives that draw it inside their WebView,</li>
  *   <li>{@code onBackPressed()}, the modern path most SDKs hook,</li>
  *   <li>a real BACK key event, for SDKs that only watch key dispatch,</li>
  *   <li>{@code finish()}, for whatever ignored all of the above.</li>
@@ -253,6 +257,26 @@ public final class TeraboxAdCloser {
             "tutup", "lewati",
             "ปิด", "ข้าม",
             "إغلاق", "تخطي",
+    };
+
+    /**
+     * Wording an ad SDK uses once the reward has been granted. Seeing it means
+     * the end card is only waiting for a close, even if the reward callback the
+     * mediation normally forwards never reached {@link #close()}.
+     */
+    private static final String[] REWARD_GRANTED_WORDS = {
+            "reward granted", "reward earned", "reward received", "reward unlocked",
+            "đã nhận thưởng", "nhận thưởng thành công",
+            "奖励已发放", "奖励已到账", "已获得奖励",
+            "報酬を獲得", "特典を獲得",
+            "보상을 받", "보상 지급 완료",
+            "recompensa recibida", "recompensa obtenida",
+            "récompense reçue", "récompense obtenue",
+            "recompensa recebida",
+            "belohnung erhalten",
+            "premio ricevuto",
+            "награда получена",
+            "ödül kazanıldı",
     };
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -458,8 +482,11 @@ public final class TeraboxAdCloser {
             // Every network has its own close path; pressing its control keeps
             // the callback (`onAdClosed`) the mediation waits for.
             if (!dismissAdUi(top)) {
-                Log.i(TAG, "Back press on " + name);
-                backPress(top);
+                // Playable and end-card creatives draw their X inside a WebView
+                // or an unnamed ImageView, so the view lookup above finds
+                // nothing. Tap the corner where that X always sits before
+                // falling back to BACK.
+                tapCloseCorner(top);
             }
         } else if (step == 1) {
             Log.i(TAG, "Back press on " + name);
@@ -521,6 +548,17 @@ public final class TeraboxAdCloser {
                 Log.w(TAG, "Ad stayed after its reward, closing it again");
                 startClose(true, 0L);
             }
+            return;
+        }
+        // The ad itself says the reward was granted, but close() never ran
+        // (some mediation callbacks bypass the injected listener). The end card
+        // is only waiting for a close, so do not sit on it for the whole reward
+        // timeout: treat it as rewarded and run the normal close ladder.
+        if (now - adSince >= 1_500L && showsRewardGranted(top)) {
+            Log.i(TAG, "Ad announced the reward, closing its end card");
+            lastRewardAt = now;
+            adSince = now;
+            startClose(false, 500L);
             return;
         }
         // No control was pressed for this ad, so it owes no reward: an
@@ -833,8 +871,14 @@ public final class TeraboxAdCloser {
             }
             Resources resources = activity.getResources();
             Candidate best = new Candidate();
-            scanForClose(decor, resources, decor.getHeight(), best, 0);
+            scanForClose(decor, resources, decor.getWidth(), decor.getHeight(), best, 0);
             if (best.view == null) {
+                return false;
+            }
+            if (best.view instanceof WebView) {
+                // Clicking a WebView presses its center, which is the creative:
+                // on a video or playable that opens the ad instead of closing it.
+                Log.i(TAG, "Skipping a WebView close candidate");
                 return false;
             }
             Log.i(TAG, "Pressing the ad's close control (" + best.idName + ")");
@@ -849,6 +893,45 @@ public final class TeraboxAdCloser {
         }
     }
 
+    /**
+     * Delivers a real tap to the top-right corner, where playable ads and end
+     * cards draw their close X inside the creative. This is only used when the
+     * view tree has no close control to press; a synthetic tap is what a user
+     * would do to that X.
+     */
+    private static boolean tapCloseCorner(Activity activity) {
+        try {
+            View decor = activity.getWindow().getDecorView();
+            if (decor == null) {
+                return false;
+            }
+            int width = decor.getWidth();
+            int height = decor.getHeight();
+            if (width <= 0 || height <= 0) {
+                return false;
+            }
+            float x = width * 0.9f;
+            // Just below the ad's title/status bar: high enough to be the X,
+            // low enough to clear the system bars when they are part of decor.
+            float y = height * 0.075f;
+            long downAt = SystemClock.uptimeMillis();
+            MotionEvent down = MotionEvent.obtain(downAt, downAt, MotionEvent.ACTION_DOWN, x, y, 0);
+            MotionEvent up = MotionEvent.obtain(downAt, downAt + 60L, MotionEvent.ACTION_UP, x, y, 0);
+            try {
+                decor.dispatchTouchEvent(down);
+                decor.dispatchTouchEvent(up);
+            } finally {
+                down.recycle();
+                up.recycle();
+            }
+            Log.i(TAG, "Tapped the close corner of " + activity.getClass().getName());
+            return true;
+        } catch (Throwable throwable) {
+            Log.w(TAG, "Could not tap the close corner", throwable);
+            return false;
+        }
+    }
+
     /** Highest-scoring close affordance found while walking the tree. */
     private static final class Candidate {
 
@@ -859,14 +942,14 @@ public final class TeraboxAdCloser {
         private String idName;
     }
 
-    private static void scanForClose(View view, Resources resources, int screenHeight,
+    private static void scanForClose(View view, Resources resources, int screenWidth, int screenHeight,
                                      Candidate best, int depth) {
         if (view == null || depth > 24 || view.getVisibility() != View.VISIBLE) {
             return;
         }
         if (view.isShown()) {
             String idName = idNameOf(view, resources);
-            int score = closeScore(view, idName, screenHeight);
+            int score = closeScore(view, idName, screenWidth, screenHeight);
             if (score > best.score) {
                 best.view = view;
                 best.score = score;
@@ -876,9 +959,49 @@ public final class TeraboxAdCloser {
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
             for (int i = group.getChildCount() - 1; i >= 0; i--) {
-                scanForClose(group.getChildAt(i), resources, screenHeight, best, depth + 1);
+                scanForClose(group.getChildAt(i), resources, screenWidth, screenHeight, best, depth + 1);
             }
         }
+    }
+
+    /** True when the ad activity itself shows that the reward was granted. */
+    private static boolean showsRewardGranted(Activity activity) {
+        try {
+            View decor = activity.getWindow().getDecorView();
+            return decor != null && showsRewardGranted(decor, 0);
+        } catch (Throwable throwable) {
+            return false;
+        }
+    }
+
+    private static boolean showsRewardGranted(View view, int depth) {
+        if (view == null || depth > 24 || view.getVisibility() != View.VISIBLE || !view.isShown()) {
+            return false;
+        }
+        CharSequence text = null;
+        if (view instanceof TextView) {
+            text = ((TextView) view).getText();
+        }
+        if (text == null) {
+            text = view.getContentDescription();
+        }
+        if (text != null) {
+            String value = text.toString().toLowerCase(Locale.ROOT);
+            for (String word : REWARD_GRANTED_WORDS) {
+                if (value.contains(word)) {
+                    return true;
+                }
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = group.getChildCount() - 1; i >= 0; i--) {
+                if (showsRewardGranted(group.getChildAt(i), depth + 1)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -887,7 +1010,7 @@ public final class TeraboxAdCloser {
      * label; a control in the top band of the ad adds two, because that is
      * where the close button sits and the creative fills the rest.
      */
-    private static int closeScore(View view, String idName, int screenHeight) {
+    private static int closeScore(View view, String idName, int screenWidth, int screenHeight) {
         if (!view.isClickable() || !view.isEnabled()) {
             return 0;
         }
@@ -907,10 +1030,39 @@ public final class TeraboxAdCloser {
                 score = 4;
             }
         }
+        if (score == 0 && isCloseCorner(view, screenWidth, screenHeight)) {
+            // An unnamed X in the top-right corner: playable/end-card close
+            // buttons are often plain ImageViews with no id or description.
+            score = 1;
+        }
         if (score > 0 && isNearTop(view, screenHeight)) {
             score += 2;
         }
         return score;
+    }
+
+    /** A small clickable control in the top-right corner of the ad. */
+    private static boolean isCloseCorner(View view, int screenWidth, int screenHeight) {
+        if (screenWidth <= 0 || screenHeight <= 0) {
+            return false;
+        }
+        try {
+            int[] location = new int[2];
+            view.getLocationOnScreen(location);
+            int width = view.getWidth();
+            int height = view.getHeight();
+            if (width <= 0 || height <= 0) {
+                return false;
+            }
+            int right = location[0] + width;
+            return location[1] >= 0
+                    && location[1] <= screenHeight * 0.18f
+                    && right >= screenWidth * 0.82f
+                    && width <= screenWidth * 0.22f
+                    && height <= screenHeight * 0.14f;
+        } catch (Throwable throwable) {
+            return false;
+        }
     }
 
     /** Close controls sit in the top band of the ad, the creative fills the rest. */
