@@ -620,6 +620,14 @@ public final class TeraboxAdCloser {
             startClose(false, 500L);
             return;
         }
+        // The app's follow-up native ad is never a long rewarded video. If it
+        // is still here after 20 s, its close callback is not coming.
+        if (isExtraNativeAd(top) && now - adSince >= 20_000L) {
+            Log.w(TAG, "Follow-up native ad stayed for 20 s, closing it");
+            adSince = now;
+            dismissNativeLater(top, 0L);
+            return;
+        }
         // AdMob shows its X on the end card. If the reward callback never
         // reached close(), the card can sit for the whole reward timeout even
         // though it is already closable. Click that X now.
