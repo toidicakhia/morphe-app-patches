@@ -583,6 +583,7 @@ public final class TeraboxAdCloser {
         // Every ad gets its own clock: without this, a reward from the previous
         // ad masked the next one and it was never closed.
         if (top != adSeen || adSince == Long.MIN_VALUE) {
+            Log.i(TAG, "Ad on top: " + top.getClass().getName());
             adSeen = top;
             adSince = now;
             // Bind the pending reward to the ad it opened. A landing page that
@@ -617,6 +618,26 @@ public final class TeraboxAdCloser {
             lastRewardAt = now;
             adSince = now;
             startClose(false, 500L);
+            return;
+        }
+        // AdMob shows its X on the end card. If the reward callback never
+        // reached close(), the card can sit for the whole reward timeout even
+        // though it is already closable. Click that X now.
+        if (isAdMobAdActivity(top) && now - adSince >= 20_000L && hasCloseControl(top)) {
+            Log.i(TAG, "AdMob end card is closable, closing it");
+            lastRewardAt = now;
+            adSince = now;
+            startClose(false, 0L);
+            return;
+        }
+        // An AdMob end card still on screen after 35 s is not going to report
+        // anything else. Close it instead of leaving it until the 75 s network
+        // timeout. 35 s still covers a full 30 s rewarded video.
+        if (isAdMobAdActivity(top) && now - adSince >= 35_000L) {
+            Log.w(TAG, "AdMob ad stayed for 35 s, closing it");
+            lastRewardAt = now;
+            adSince = now;
+            startClose(true, 0L);
             return;
         }
         // A rewarded ad the clicker did not announce (a sign-in popup opens its
@@ -950,33 +971,50 @@ public final class TeraboxAdCloser {
      * id name is read from the view itself.
      */
     private static boolean dismissAdUi(Activity activity) {
+        Candidate best = findCloseCandidate(activity);
+        if (best == null) {
+            return false;
+        }
+        Log.i(TAG, "Pressing the ad's close control (" + best.idName + ", score " + best.score + ")");
+        if (best.view.performClick()) {
+            return true;
+        }
+        if (best.view.callOnClick()) {
+            return true;
+        }
+        // Some networks draw the X and handle it in onTouchEvent, so a
+        // synthesized performClick() never reaches their close path.
+        Log.i(TAG, "Close control ignored the click, tapping it");
+        return tapView(best.view);
+    }
+
+    /**
+     * The best close control, or null. A WebView is not a close control:
+     * performClick() on it presses the center of the creative, which opens the
+     * ad instead of closing it.
+     */
+    private static Candidate findCloseCandidate(Activity activity) {
         try {
             View decor = activity.getWindow().getDecorView();
             if (decor == null) {
-                return false;
+                return null;
             }
             Resources resources = activity.getResources();
             Candidate best = new Candidate();
             scanForClose(decor, resources, decor.getWidth(), decor.getHeight(), best, 0);
-            if (best.view == null) {
-                return false;
+            if (best.view == null || best.view instanceof WebView) {
+                return null;
             }
-            if (best.view instanceof WebView) {
-                // Clicking a WebView presses its center, which is the creative:
-                // on a video or playable that opens the ad instead of closing it.
-                Log.i(TAG, "Skipping a WebView close candidate");
-                return false;
-            }
-            Log.i(TAG, "Pressing the ad's close control (" + best.idName + ")");
-            if (best.view.performClick()) {
-                return true;
-            }
-            best.view.callOnClick();
-            return true;
+            return best;
         } catch (Throwable throwable) {
-            Log.w(TAG, "Could not press the ad's close control", throwable);
-            return false;
+            Log.w(TAG, "Could not read the ad's close control", throwable);
+            return null;
         }
+    }
+
+    /** True when the ad currently shows a control that can close it. */
+    private static boolean hasCloseControl(Activity activity) {
+        return findCloseCandidate(activity) != null;
     }
 
     /**
@@ -991,30 +1029,94 @@ public final class TeraboxAdCloser {
             if (decor == null) {
                 return false;
             }
-            int width = decor.getWidth();
-            int height = decor.getHeight();
+            // The X in an HTML creative sits near the top-right of the WebView.
+            // Using the WebView as the reference keeps a title/status bar above
+            // the creative from pushing the tap too high.
+            View target = largestWebView(decor);
+            if (target == null) {
+                target = decor;
+            }
+            int[] location = new int[2];
+            target.getLocationOnScreen(location);
+            int width = target.getWidth();
+            int height = target.getHeight();
             if (width <= 0 || height <= 0) {
                 return false;
             }
-            float x = width * 0.92f;
-            // The X sits in the top-right corner: about 6-7% down a full-screen
-            // landing page, a little lower when a title bar is part of the decor.
-            float y = height * 0.065f;
+            float x = location[0] + width * 0.92f;
+            float y = location[1] + height * 0.035f;
+            return tapScreen(decor, x, y, "close corner of " + activity.getClass().getName());
+        } catch (Throwable throwable) {
+            Log.w(TAG, "Could not tap the close corner", throwable);
+            return false;
+        }
+    }
+
+    /** Delivers a real tap to the center of a close control. */
+    private static boolean tapView(View view) {
+        try {
+            if (view == null || view.getWidth() <= 0 || view.getHeight() <= 0) {
+                return false;
+            }
+            int[] location = new int[2];
+            view.getLocationOnScreen(location);
+            float x = location[0] + view.getWidth() / 2f;
+            float y = location[1] + view.getHeight() / 2f;
+            return tapScreen(view.getRootView(), x, y, "close control");
+        } catch (Throwable throwable) {
+            Log.w(TAG, "Could not tap the close control", throwable);
+            return false;
+        }
+    }
+
+    private static boolean tapScreen(View root, float screenX, float screenY, String what) {
+        try {
+            int[] rootLocation = new int[2];
+            root.getLocationOnScreen(rootLocation);
+            float x = screenX - rootLocation[0];
+            float y = screenY - rootLocation[1];
             long downAt = SystemClock.uptimeMillis();
             MotionEvent down = MotionEvent.obtain(downAt, downAt, MotionEvent.ACTION_DOWN, x, y, 0);
             MotionEvent up = MotionEvent.obtain(downAt, downAt + 60L, MotionEvent.ACTION_UP, x, y, 0);
             try {
-                decor.dispatchTouchEvent(down);
-                decor.dispatchTouchEvent(up);
+                root.dispatchTouchEvent(down);
+                root.dispatchTouchEvent(up);
             } finally {
                 down.recycle();
                 up.recycle();
             }
-            Log.i(TAG, "Tapped the close corner of " + activity.getClass().getName());
+            Log.i(TAG, "Tapped " + what + " at " + Math.round(x) + "," + Math.round(y));
             return true;
         } catch (Throwable throwable) {
-            Log.w(TAG, "Could not tap the close corner", throwable);
+            Log.w(TAG, "Could not tap " + what, throwable);
             return false;
+        }
+    }
+
+    /** The biggest visible WebView, i.e. the ad creative, or null. */
+    private static View largestWebView(View root) {
+        View[] best = new View[1];
+        long[] area = new long[]{-1};
+        largestWebView(root, best, area, 0);
+        return best[0];
+    }
+
+    private static void largestWebView(View view, View[] best, long[] area, int depth) {
+        if (view == null || depth > 24 || view.getVisibility() != View.VISIBLE || !view.isShown()) {
+            return;
+        }
+        if (view instanceof WebView) {
+            long size = (long) view.getWidth() * view.getHeight();
+            if (size > area[0]) {
+                area[0] = size;
+                best[0] = view;
+            }
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = group.getChildCount() - 1; i >= 0; i--) {
+                largestWebView(group.getChildAt(i), best, area, depth + 1);
+            }
         }
     }
 
