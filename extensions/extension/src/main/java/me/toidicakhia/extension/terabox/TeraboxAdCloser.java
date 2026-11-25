@@ -628,21 +628,32 @@ public final class TeraboxAdCloser {
             dismissNativeLater(top, 0L);
             return;
         }
-        // AdMob shows its X on the end card. If the reward callback never
-        // reached close(), the card can sit for the whole reward timeout even
-        // though it is already closable. Click that X now.
-        if (isAdMobAdActivity(top) && now - adSince >= 20_000L && hasCloseControl(top)) {
-            Log.i(TAG, "AdMob end card is closable, closing it");
+        // The end card can be any network in the MAX waterfall (the Shopee
+        // card in the capture is Pangle, not AdMob). Once it shows its X, it
+        // is not going to report anything else: click that X instead of
+        // leaving it until the reward timeout.
+        if (now - adSince >= 20_000L && hasCloseControl(top)) {
+            Log.i(TAG, "Ad end card is closable, closing it");
             lastRewardAt = now;
             adSince = now;
             startClose(false, 0L);
             return;
         }
-        // An AdMob end card still on screen after 35 s is not going to report
-        // anything else. Close it instead of leaving it until the 75 s network
-        // timeout. 35 s still covers a full 30 s rewarded video.
-        if (isAdMobAdActivity(top) && now - adSince >= 35_000L) {
-            Log.w(TAG, "AdMob ad stayed for 35 s, closing it");
+        // A closable end card still on screen after 35 s is stuck. Close it
+        // instead of leaving it until the 75 s network timeout. 35 s still
+        // covers a full 30 s rewarded video.
+        if (now - adSince >= 35_000L && hasCloseControl(top)) {
+            Log.w(TAG, "Ad stayed for 35 s with a close control, closing it");
+            lastRewardAt = now;
+            adSince = now;
+            startClose(true, 0L);
+            return;
+        }
+        // When the X is drawn inside the creative there is no native control
+        // to detect. Cap any rewarded ad at 45 s so an HTML end card cannot
+        // hold the task flow either.
+        if (now - adSince >= 45_000L && (rewardExpected() || showsRewardedAd(top))) {
+            Log.w(TAG, "Rewarded ad stayed for 45 s, closing it");
             lastRewardAt = now;
             adSince = now;
             startClose(true, 0L);
