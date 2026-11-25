@@ -287,6 +287,20 @@ public final class TeraboxAdCloser {
             "ödül kazanıldı",
     };
 
+    /**
+     * Wording of a rewarded ad, before it pays. An AdMob rewarded video shows
+     * this while it plays; seeing it means the ad owes a reward even if the
+     * clicker did not announce the spend (some sign-in/guide-ad popups open
+     * their own ad through the H5).
+     */
+    private static final String[] REWARD_AD_WORDS = {
+            "reward", "rewarded",
+            "phần thưởng", "nhận thưởng",
+            "奖励", "报酬", "報酬", "特典",
+            "보상",
+            "recompensa", "récompense", "belohnung", "premio", "награда", "ödül",
+    };
+
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     /** Cached reflection handles; resolved once, retried on failure. */
@@ -378,6 +392,13 @@ public final class TeraboxAdCloser {
             @Override
             public void run() {
                 if (isGone(activity) || !isOnTop(activity)) {
+                    return;
+                }
+                // An AdMob rewarded ad can start inside the app-open window.
+                // Its reward UI means it is not the app-open ad: leave it to
+                // the reward timeout instead of cutting it after 4.5 s.
+                if (!isSplash(name) && showsRewardedAd(activity)) {
+                    Log.i(TAG, "Reward ad shown, leaving it to the reward timeout");
                     return;
                 }
                 Log.i(TAG, "Closing the ad that nobody waits for");
@@ -598,10 +619,17 @@ public final class TeraboxAdCloser {
             startClose(false, 500L);
             return;
         }
-        // No control was pressed for this ad, so it owes no reward: an
-        // interstitial, a landing page or an app-open ad. A short grace is
-        // enough for those, while the rewarded video keeps the full timeout.
-        long limit = rewardExpectedFor(top) ? STUCK_AD_TIMEOUT_MS : 6_000L;
+        // A rewarded ad the clicker did not announce (a sign-in popup opens its
+        // own ad through the H5) still owes a reward. Its own UI says so, so do
+        // not cut it after the interstitial grace. AdMob is the network those
+        // popups use, so a pending reward always covers its AdActivity even if
+        // the expectation was bound to an earlier waterfall layer.
+        boolean owesReward = rewardExpectedFor(top)
+                || (rewardExpected() && isAdMobAdActivity(top))
+                || (now - adSince >= 1_500L && showsRewardedAd(top));
+        // No reward is due for an interstitial, a landing page or an app-open
+        // ad, so a short grace is enough for those.
+        long limit = owesReward ? STUCK_AD_TIMEOUT_MS : 6_000L;
         if (now - adSince > limit) {
             Log.w(TAG, "Ad did not report a reward after " + (now - adSince) + " ms, closing it");
             adSince = now;
@@ -725,6 +753,16 @@ public final class TeraboxAdCloser {
     /** True for the app's own full-screen native ad scene. */
     private static boolean isExtraNativeAd(Activity activity) {
         return activity != null && EXTRA_NATIVE_ACTIVITY.equals(activity.getClass().getName());
+    }
+
+    /** True for AdMob's rewarded/interstitial player, the placement the task uses. */
+    private static boolean isAdMobAdActivity(Activity activity) {
+        if (activity == null) {
+            return false;
+        }
+        String name = activity.getClass().getName();
+        return name.equals("com.google.android.gms.ads.AdActivity")
+                || name.startsWith("com.google.android.gms.ads.admanager.");
     }
 
     /** Finds the app's follow-up native ad anywhere in the stack, not only on top. */
@@ -1014,15 +1052,24 @@ public final class TeraboxAdCloser {
 
     /** True when the ad activity itself shows that the reward was granted. */
     private static boolean showsRewardGranted(Activity activity) {
+        return showsRewardWord(activity, REWARD_GRANTED_WORDS);
+    }
+
+    /** True when the ad activity shows rewarded-ad wording. */
+    private static boolean showsRewardedAd(Activity activity) {
+        return showsRewardWord(activity, REWARD_AD_WORDS);
+    }
+
+    private static boolean showsRewardWord(Activity activity, String[] words) {
         try {
             View decor = activity.getWindow().getDecorView();
-            return decor != null && showsRewardGranted(decor, 0);
+            return decor != null && showsRewardWord(decor, 0, words);
         } catch (Throwable throwable) {
             return false;
         }
     }
 
-    private static boolean showsRewardGranted(View view, int depth) {
+    private static boolean showsRewardWord(View view, int depth, String[] words) {
         if (view == null || depth > 24 || view.getVisibility() != View.VISIBLE || !view.isShown()) {
             return false;
         }
@@ -1035,7 +1082,7 @@ public final class TeraboxAdCloser {
         }
         if (text != null) {
             String value = text.toString().toLowerCase(Locale.ROOT);
-            for (String word : REWARD_GRANTED_WORDS) {
+            for (String word : words) {
                 if (value.contains(word)) {
                     return true;
                 }
@@ -1044,7 +1091,7 @@ public final class TeraboxAdCloser {
         if (view instanceof ViewGroup) {
             ViewGroup group = (ViewGroup) view;
             for (int i = group.getChildCount() - 1; i >= 0; i--) {
-                if (showsRewardGranted(group.getChildAt(i), depth + 1)) {
+                if (showsRewardWord(group.getChildAt(i), depth + 1, words)) {
                     return true;
                 }
             }

@@ -52,9 +52,16 @@ final class TeraboxTaskScript {
             // Targets that spend an ad when pressed. The closer treats an ad that
             // follows one of these as owing a reward, so every watch-video control
             // belongs here.
-            "var AD_TARGETS=[WATCH_GROUP,WATCH_CARD,'button.tc-v2-lucky-bag__cta:not(.is-completed)','.task-top-card','.welfare-header-getCoinsCard','.expire-coin-box .view-video-btn','.tc-lucky-bag__cta:not(.is-completed)','.tc-lb-dialog__cta','.reward-toast .extra-button.video'];",
+            "var AD_TARGETS=[WATCH_GROUP,WATCH_CARD,'button.tc-v2-lucky-bag__cta:not(.is-completed)','.task-top-card','.welfare-header-getCoinsCard','.expire-coin-box .view-video-btn','.tc-lucky-bag__cta:not(.is-completed)','.tc-lb-dialog__cta','.reward-toast .extra-button.video','.popup-bg-box .popup-box .video-btn:not(.notClickable)','.popup-card:has(.auto-sign-content) .popup-btn','.popup-card:has(.guide-ad-wrapper) .popup-btn','.auto-sign-rewards-mask .watch-video-btn','.guide-ad-mask .guide-ad-watch-btn'];",
 
             "var TARGETS=[",
+            // These popups start a rewarded ad through their own button, so
+            // they must come before the generic popup-button selectors: the
+            // closer has to know the ad owes a reward or it cuts it short.
+            "'.popup-card:has(.auto-sign-content) .popup-btn',",
+            "'.popup-card:has(.guide-ad-wrapper) .popup-btn',",
+            "'.auto-sign-rewards-mask .watch-video-btn',",
+            "'.guide-ad-mask .guide-ad-watch-btn',",
             // Popups first: they cover the page.
             "'.base-popup-card .base-popup-btn',",
             "'.popup-card .popup-btn',",
