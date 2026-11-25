@@ -52,12 +52,13 @@ final class TeraboxTaskScript {
             // Targets that spend an ad when pressed. The closer treats an ad that
             // follows one of these as owing a reward, so every watch-video control
             // belongs here.
-            "var AD_TARGETS=[WATCH_GROUP,WATCH_CARD,'button.tc-v2-lucky-bag__cta:not(.is-completed)','.task-top-card','.welfare-header-getCoinsCard','.expire-coin-box .view-video-btn','.tc-lucky-bag__cta:not(.is-completed)','.tc-lb-dialog__cta','.reward-toast .extra-button.video','.popup-bg-box .popup-box .video-btn:not(.notClickable)','.popup-card:has(.auto-sign-content) .popup-btn','.popup-card:has(.guide-ad-wrapper) .popup-btn','.auto-sign-rewards-mask .watch-video-btn','.guide-ad-mask .guide-ad-watch-btn'];",
+            "var AD_TARGETS=[WATCH_GROUP,WATCH_CARD,'button.tc-v2-lucky-bag__cta:not(.is-completed)','.task-top-card','.welfare-header-getCoinsCard','.expire-coin-box .view-video-btn','.tc-lucky-bag__cta:not(.is-completed)','.tc-lb-dialog__cta','.reward-toast .extra-button.video','.popup-bg-box .popup-box .video-btn:not(.notClickable)','.tb-reward-popup','.popup-card:has(.auto-sign-content) .popup-btn','.popup-card:has(.guide-ad-wrapper) .popup-btn','.auto-sign-rewards-mask .watch-video-btn','.guide-ad-mask .guide-ad-watch-btn'];",
 
             "var TARGETS=[",
             // These popups start a rewarded ad through their own button, so
             // they must come before the generic popup-button selectors: the
             // closer has to know the ad owes a reward or it cuts it short.
+            "'.tb-reward-popup',",
             "'.popup-card:has(.auto-sign-content) .popup-btn',",
             "'.popup-card:has(.guide-ad-wrapper) .popup-btn',",
             "'.auto-sign-rewards-mask .watch-video-btn',",
@@ -109,6 +110,11 @@ final class TeraboxTaskScript {
             "function onScreen(el){try{var r=el.getBoundingClientRect(),h=window.innerHeight||1e9,w=window.innerWidth||1e9;return r.bottom>0&&r.right>0&&r.top<h&&r.left<w;}catch(e){return false;}}",
             "function covered(el){try{var r=el.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;if(x<0||y<0||x>(window.innerWidth||1e9)||y>(window.innerHeight||1e9))return false;var top=document.elementFromPoint(x,y);if(!top||top===el||el.contains&&el.contains(top)||top.contains&&top.contains(el))return false;if(top.getAttribute&&top.getAttribute('role')==='dialog')return true;for(var p=top;p&&p!==document.body;p=p.parentElement){if(/popup-bg-box|popup-mask|dialog-mask|base-popup-mask|base-popup-card|popup-card|auto-sign-rewards-mask|continuous-sign-in-popup|sign-rules|makeup-card-content|task-sheet-mask|record-drawer-mask|guide-ad-mask|reward-toast|watch-video-popup|poll-mask/.test(cls(p)))return true;}}catch(e){}return false;}",
             "function loading(){try{var n=document.querySelectorAll(LOADERS);for(var i=0;i<n.length;i++){var r=n[i].getBoundingClientRect();if(visible(n[i])&&r.width>=40&&r.height>=40)return true;}}catch(e){}return false;}",
+            // The sign-in/guide-ad popup opens a rewarded ad through its own
+            // button. Tag it so pick() can tell it apart from the other popups
+            // whose button merely closes them; a tagged button is also listed
+            // in AD_TARGETS, so the closer expects the reward.
+            "function markRewardPopups(){try{var n=document.querySelectorAll('.auto-sign-content,.guide-ad-wrapper');for(var i=0;i<n.length;i++){var c=n[i].closest?n[i].closest('.popup-card,.base-popup-card'):null;var b=c&&c.querySelector?c.querySelector('.popup-btn,.base-popup-btn'):null;if(b&&b.classList)b.classList.add('tb-reward-popup');}}catch(e){}}",
 
             // --- candidate matching ---------------------------------------------
             "function watchGroup(){var groups;try{groups=document.querySelectorAll('.tc-task-group');}catch(e){return null;}for(var i=0;i<groups.length;i++){var head=groups[i].querySelector('.group-title');if(!head)continue;var text=(''+((head.innerText||head.textContent)||'')).replace(/\\s+/g,' ').trim();if(WATCH_WORDS.test(text))return groups[i];}return null;}",
@@ -143,6 +149,7 @@ final class TeraboxTaskScript {
             "if(document.hidden){note('page is hidden');return;}",
             "if(pending&&now-pending.at>=(pending.ad?VERIFY*3:VERIFY)){dead[pending.key]=now;pending=null;note('that control had no effect, skipping it for a while');}",
             "if(now-pageAt<SETTLE){note('page just loaded');return;}",
+            "markRewardPopups();",
             "var cand=pick(now);",
             "if(!cand&&loading()){if(!loadStart)loadStart=now;if(now-loadStart<3000){note('waiting for the page to finish loading');return;}}",
             "loadStart=0;",
