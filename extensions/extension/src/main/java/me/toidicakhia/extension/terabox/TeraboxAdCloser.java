@@ -145,9 +145,11 @@ public final class TeraboxAdCloser {
     private static volatile long rewardExpectedUntil = Long.MIN_VALUE;
 
     /**
-     * The Activity the pending reward belongs to. A landing page the rewarded
-     * ad opens is a different Activity; it owes no reward and must not inherit
-     * the rewarded ad's timeout.
+     * The Activity the pending reward currently belongs to. It follows the
+     * rewarded layer through the waterfall: a MAX loading screen can hand the
+     * video off to another network's player, and that player owes the reward.
+     * A landing page the ad opens is a different Activity; it owes no reward
+     * and must not inherit the rewarded ad's timeout.
      */
     private static volatile Activity rewardExpectedAd;
 
@@ -586,10 +588,15 @@ public final class TeraboxAdCloser {
             Log.i(TAG, "Ad on top: " + top.getClass().getName());
             adSeen = top;
             adSince = now;
-            // Bind the pending reward to the ad it opened. A landing page that
-            // ad starts later is a different Activity, so it keeps the short
-            // interstitial grace instead of the rewarded video's timeout.
-            if (rewardExpected() && (rewardExpectedAd == null || isGone(rewardExpectedAd))) {
+            // The pending reward follows the rewarded layer. MAX can answer a
+            // request with one network's loading screen and then hand the video
+            // to another network's player; the player becomes the top ad surface
+            // and is the one still owing the reward. Keeping the reward bound to
+            // the earlier layer made every later layer fall through to the 6 s
+            // interstitial grace, cutting the video before it could pay. A
+            // landing page or in-ad browser the ad opens is the exception: it
+            // has its own X and no reward to report, so it keeps the short grace.
+            if (rewardExpected() && !isLandingPage(top)) {
                 rewardExpectedAd = top;
             }
             return;
@@ -662,8 +669,7 @@ public final class TeraboxAdCloser {
         // A rewarded ad the clicker did not announce (a sign-in popup opens its
         // own ad through the H5) still owes a reward. Its own UI says so, so do
         // not cut it after the interstitial grace. AdMob is the network those
-        // popups use, so a pending reward always covers its AdActivity even if
-        // the expectation was bound to an earlier waterfall layer.
+        // popups use, so a pending reward always covers its AdActivity too.
         boolean owesReward = rewardExpectedFor(top)
                 || (rewardExpected() && isAdMobAdActivity(top))
                 || (now - adSince >= 1_500L && showsRewardedAd(top));
@@ -685,7 +691,22 @@ public final class TeraboxAdCloser {
 
     /** True when the pending reward belongs to {@code ad}, not to a page it opened. */
     private static boolean rewardExpectedFor(Activity ad) {
-        return rewardExpected() && (rewardExpectedAd == null || rewardExpectedAd == ad);
+        return rewardExpected() && !isLandingPage(ad)
+                && (rewardExpectedAd == null || rewardExpectedAd == ad);
+    }
+
+    /**
+     * A landing page or in-ad browser opened from a rewarded ad. It is still an
+     * ad surface, but it owes no reward of its own: it has its own close X and
+     * the reward is reported by the player underneath it.
+     */
+    private static boolean isLandingPage(Activity activity) {
+        if (activity == null) {
+            return false;
+        }
+        String name = activity.getClass().getName().toLowerCase(Locale.ROOT);
+        return name.contains("landing") || name.contains("browser")
+                || name.contains("website") || name.contains("webpage");
     }
 
     /** True for the app's own app-open ad: it follows the host and owes no reward. */
