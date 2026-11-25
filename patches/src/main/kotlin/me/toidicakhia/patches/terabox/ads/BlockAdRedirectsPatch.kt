@@ -5,6 +5,7 @@
 package me.toidicakhia.patches.terabox.ads
 
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
 import app.morphe.patcher.patch.PatchException
@@ -16,6 +17,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 import me.toidicakhia.patches.shared.Constants
+import me.toidicakhia.patches.shared.misc.smali.parameterRegister
 
 /**
  * Every store/market URL the ad SDKs fall back to is rewritten to a blank page.
@@ -31,6 +33,8 @@ import me.toidicakhia.patches.shared.Constants
  * client, so the app's "rate us", update and help links keep working.
  */
 private const val BLOCKED_URL = "about:blank"
+
+private const val WEBVIEW_HANDOFF = "Lme/toidicakhia/extension/terabox/TeraboxWebViewHandoff;"
 
 /** Packages that launch the store or a browser from an ad. */
 private val AD_PACKAGE_PREFIXES = listOf(
@@ -93,7 +97,9 @@ internal object WebViewStoreHandoffFingerprint : Fingerprint(
 
 /**
  * `r(WebView, String)Z` is the app's generic hand-off to another app or the
- * browser for a URL the WebView will not load itself.
+ * browser for a URL the WebView will not load itself. It also carries the
+ * app's own `terabox://` and `dubox://` deep links, so only the hand-offs that
+ * leave TeraBox may be refused.
  */
 internal object WebViewExternalHandoffFingerprint : Fingerprint(
     definingClass = "Lcom/dubox/drive/business/widget/webview/client/____;",
@@ -109,7 +115,7 @@ internal object WebViewExternalHandoffFingerprint : Fingerprint(
  * Ad clicks are the one place where TeraBox lets an external app take over the
  * screen: the store opens, the automation loses the foreground and the clicker
  * pauses until the user comes back. This patch keeps every one of those
- * hand-offs inside the app.
+ * hand-offs inside the app, without touching the app's own deep links.
  */
 @Suppress("unused")
 val blockAdRedirectsPatch = bytecodePatch(
@@ -122,9 +128,26 @@ val blockAdRedirectsPatch = bytecodePatch(
     compatibleWith(Constants.TERABOX_COMPATIBILITY)
 
     execute {
-        // The app's own WebViews: refuse the store and any other app hand-off.
+        // The store helper only ever builds market:/play.google.com URLs, so
+        // refusing it outright is safe.
         WebViewStoreHandoffFingerprint.matchSingle().method.returnEarly(true)
-        WebViewExternalHandoffFingerprint.matchSingle().method.returnEarly(true)
+
+        // The generic hand-off also carries the app's own deep links. Returning
+        // true for those swallowed them, so a tap on a video card (or any other
+        // terabox:// control) on a hybrid page did nothing. Let the original
+        // method handle the app's schemes and keep refusing the rest.
+        val handoff = WebViewExternalHandoffFingerprint.matchSingle().method
+        handoff.addInstructions(
+            0,
+            """
+                invoke-static {${handoff.parameterRegister(1)}}, $WEBVIEW_HANDOFF->isInAppPage(Ljava/lang/String;)Z
+                move-result v0
+                if-eqz v0, :tb_in_app_page
+                const/4 v0, 0x1
+                return v0
+                :tb_in_app_page
+            """.trimIndent()
+        )
 
         val types = mutableListOf<String>()
         classDefForEach { classDef ->

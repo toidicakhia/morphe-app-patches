@@ -32,8 +32,9 @@ final class TeraboxTaskScript {
             // --- redirect guard -------------------------------------------------
             // A mis-tapped ad or task card must not hand the screen to the Play
             // Store or a browser: TeraBox would go to the background and the
-            // clicker would pause until the user comes back.
-            "try{window.open=function(){note('blocked a web popup');return null;};}catch(e){}",
+            // clicker would pause until the user comes back. Other popups still
+            // go through, because the page opens its own video pages that way.
+            "try{var tbOpen=window.open;window.open=function(u){try{var h=''+(u||'');if(!h||/^market:|^intent:|play\\.google\\.com|browser_fallback_url/i.test(h)){note('blocked a web popup');return null;}}catch(e2){}return tbOpen.apply(window,arguments);};}catch(e){}",
             "try{document.addEventListener('click',function(ev){try{var a=ev.target&&ev.target.closest?ev.target.closest('a[href]'):null;if(!a)return;var h=''+(a.getAttribute('href')||'');if(/^market:|^intent:|play\\.google\\.com/i.test(h)){ev.preventDefault();ev.stopPropagation();note('blocked an ad redirect');}}catch(e2){}},true);}catch(e){}",
 
             // --- selectors ------------------------------------------------------
