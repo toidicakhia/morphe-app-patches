@@ -90,10 +90,10 @@ import java.util.Locale;
  *
  * Only a control the clicker pressed spends a reward; the clicker says so
  * through {@link #expectReward()}. An ad that appears without that (an
- * interstitial between pages, an app-open ad, a failed fill) is closed a few
- * seconds after it appears instead of holding the screen until the reward
- * timeout, and every ad gets its own clock so a reward from the previous one
- * cannot mask it.
+ * interstitial between pages, a landing page the rewarded ad opens, an
+ * app-open ad, a failed fill) is closed a few seconds after it appears instead
+ * of holding the screen until the reward timeout, and every ad gets its own
+ * clock so a reward from the previous one cannot mask it.
  *
  * The app's follow-up native ad is dismissed the same way: its own
  * {@code onBackPressed()} is what invokes the static {@code onAdClose}
@@ -143,6 +143,13 @@ public final class TeraboxAdCloser {
      * the clicker presses a control that spends one.
      */
     private static volatile long rewardExpectedUntil = Long.MIN_VALUE;
+
+    /**
+     * The Activity the pending reward belongs to. A landing page the rewarded
+     * ad opens is a different Activity; it owes no reward and must not inherit
+     * the rewarded ad's timeout.
+     */
+    private static volatile Activity rewardExpectedAd;
 
     /**
      * End of the window in which an ad counts as the app's own app-open ad,
@@ -393,6 +400,7 @@ public final class TeraboxAdCloser {
      */
     public static void expectReward() {
         rewardExpectedUntil = SystemClock.elapsedRealtime() + 90_000L;
+        rewardExpectedAd = null;
     }
 
     /** Called from the injected reward callback, before the app handles it. */
@@ -402,6 +410,7 @@ public final class TeraboxAdCloser {
         adSince = Long.MIN_VALUE;
         // Nor is any other ad still expected to report one.
         rewardExpectedUntil = Long.MIN_VALUE;
+        rewardExpectedAd = null;
         // The app starts its extra native ad from the reward callback, so it is
         // not on top yet; poll for it while the player is being closed.
         watchExtraNativeAd();
@@ -533,6 +542,12 @@ public final class TeraboxAdCloser {
         if (top != adSeen || adSince == Long.MIN_VALUE) {
             adSeen = top;
             adSince = now;
+            // Bind the pending reward to the ad it opened. A landing page that
+            // ad starts later is a different Activity, so it keeps the short
+            // interstitial grace instead of the rewarded video's timeout.
+            if (rewardExpected() && (rewardExpectedAd == null || isGone(rewardExpectedAd))) {
+                rewardExpectedAd = top;
+            }
             return;
         }
         // The sentinel must be checked before subtracting: `now - Long.MIN_VALUE`
@@ -562,9 +577,9 @@ public final class TeraboxAdCloser {
             return;
         }
         // No control was pressed for this ad, so it owes no reward: an
-        // interstitial or an app-open ad. A short grace is enough for those,
-        // while a rewarded video keeps the full timeout.
-        long limit = rewardExpected() ? STUCK_AD_TIMEOUT_MS : 6_000L;
+        // interstitial, a landing page or an app-open ad. A short grace is
+        // enough for those, while the rewarded video keeps the full timeout.
+        long limit = rewardExpectedFor(top) ? STUCK_AD_TIMEOUT_MS : 6_000L;
         if (now - adSince > limit) {
             Log.w(TAG, "Ad did not report a reward after " + (now - adSince) + " ms, closing it");
             adSince = now;
@@ -576,6 +591,11 @@ public final class TeraboxAdCloser {
     private static boolean rewardExpected() {
         return rewardExpectedUntil != Long.MIN_VALUE
                 && SystemClock.elapsedRealtime() < rewardExpectedUntil;
+    }
+
+    /** True when the pending reward belongs to {@code ad}, not to a page it opened. */
+    private static boolean rewardExpectedFor(Activity ad) {
+        return rewardExpected() && (rewardExpectedAd == null || rewardExpectedAd == ad);
     }
 
     /** True for the app's own app-open ad: it follows the host and owes no reward. */
@@ -910,10 +930,10 @@ public final class TeraboxAdCloser {
             if (width <= 0 || height <= 0) {
                 return false;
             }
-            float x = width * 0.9f;
-            // Just below the ad's title/status bar: high enough to be the X,
-            // low enough to clear the system bars when they are part of decor.
-            float y = height * 0.075f;
+            float x = width * 0.92f;
+            // The X sits in the top-right corner: about 6-7% down a full-screen
+            // landing page, a little lower when a title bar is part of the decor.
+            float y = height * 0.065f;
             long downAt = SystemClock.uptimeMillis();
             MotionEvent down = MotionEvent.obtain(downAt, downAt, MotionEvent.ACTION_DOWN, x, y, 0);
             MotionEvent up = MotionEvent.obtain(downAt, downAt + 60L, MotionEvent.ACTION_UP, x, y, 0);
