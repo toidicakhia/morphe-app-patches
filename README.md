@@ -17,6 +17,7 @@ This bundle currently supports:
 | Universal Copy | 7.2.0 | Unlock Plus, remove ads/upgrade prompts and the Internet permission |
 | NetMonster | 4.0.5 | Unlock premium |
 | HTTP Sniffer | 2.5.2-ad_mob, 2.4.9-ad_mob | Unlock VIP |
+| Proxyman | 1.33.0 | Unlock Pro |
 | VTVGo | 12.11.19 | Remove video/product ads, disable analytics, remove Ad ID permissions |
 | TeraBox | 4.29.0 | Bypass SSL pinning |
 
@@ -26,7 +27,7 @@ updated fingerprints before a patch can be applied.
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.8.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.8.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;21 patches total
+> **[v1.8.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.8.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;22 patches total
 <details open>
 <summary><img src=".github/assets/apps/vn.vtv.vtvgo.png" alt="" height="20"> VTVGo&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
@@ -157,6 +158,21 @@ updated fingerprints before a patch can be applied.
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Unlock Premium](#unlock-premium) | Unlocks all premium features. |  |
+
+</details>
+
+<details open>
+<summary><img src=".github/assets/apps/com.proxyman.proxymanandroid.png" alt="" height="20"> Proxyman&nbsp;&nbsp;•&nbsp;&nbsp;1 patch</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 1.33.0 |
+| :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Unlock Pro](#unlock-pro) | Unlocks Pro: unlimited SSL proxying entries, filters, pinning, block/map/rewrite and breakpoint rules, the advanced body editor, Compose entries, Live Update and the widget. Also bypasses the PairIP license check so the repacked app starts. |  |
 
 </details>
 
