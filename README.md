@@ -121,8 +121,8 @@ updated fingerprints before a patch can be applied.
 
 **🎯 Supported versions:**
 
-| 1.247.3 | 1.247.1 |
-| :---: | :---: |
+| 1.247.3 |
+| :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|

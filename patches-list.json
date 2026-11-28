@@ -460,18 +460,6 @@
               "isExperimental": false,
               "minSdk": 27,
               "description": null
-            },
-            {
-              "version": "1.247.1",
-              "versionCodes": {
-                "ARM64_V8A": 632,
-                "ARMEABI_V7A": 632,
-                "X86_64": 632,
-                "X86": 632
-              },
-              "isExperimental": false,
-              "minSdk": 27,
-              "description": null
             }
           ]
         }
@@ -555,18 +543,6 @@
                 "ARMEABI_V7A": 636,
                 "X86_64": 636,
                 "X86": 636
-              },
-              "isExperimental": false,
-              "minSdk": 27,
-              "description": null
-            },
-            {
-              "version": "1.247.1",
-              "versionCodes": {
-                "ARM64_V8A": 632,
-                "ARMEABI_V7A": 632,
-                "X86_64": 632,
-                "X86": 632
               },
               "isExperimental": false,
               "minSdk": 27,

@@ -61,9 +61,10 @@ Phạm vi của tài liệu này là lập kế hoạch; chưa thay đổi mã n
 | `LocketUnlockGoldPatch.kt` | Thay bytecode Hermes của `androidGoldSubscriptionOverride()` bằng `LoadConstTrue; Ret`, biến flag `android_gold_subscription_override` thành `true`. |
 | `LocketSpooferServerPatch.kt` | Đổi `extra.api.baseUrl` trong `assets/app.config`, đổi tên khoá RC `functions_domains` → `functions_domainz` trong bundle Hermes và `classes2.dex`, tuỳ chọn chuyển hướng RevenueCat và Remote Config. |
 
-Cả hai đều khai báo `compatibleWith(LOCKET_COMPATIBILITY)`, hiện bị **khoá ở
-1.247.1 / versionCode 632** trong `patches/src/main/kotlin/me/toidicakhia/patches/shared/Constants.kt`.
-Trong khi đó tài liệu nghiên cứu mô tả **1.247.3 / 636**. Đây là điểm cần xử lý đầu tiên.
+Cả hai đều khai báo `compatibleWith(LOCKET_COMPATIBILITY)`, hiện đã được chuyển
+sang **1.247.3 / versionCode 636** trong
+`patches/src/main/kotlin/me/toidicakhia/patches/shared/Constants.kt`, khớp với bản
+mà tài liệu nghiên cứu phân tích. Phiên bản 1.247.1 đã bị loại bỏ khỏi danh sách hỗ trợ.
 
 Cơ chế đăng ký bản vá: tự động quét jar (`util/PatchListGenerator.kt`), nên khi
 thêm một `val ... = resourcePatch(...)` cấp cao thì không cần sửa file đăng ký tập trung.
@@ -107,7 +108,7 @@ Nguyên tắc: nếu một tính năng bắt buộc phải có máy chủ, bản
 
 - Cập nhật `LOCKET_COMPATIBILITY` trong
   `patches/src/main/kotlin/me/toidicakhia/patches/shared/Constants.kt` lên
-  **1.247.3 / 636**; chỉ giữ 1.247.1 làm `AppTarget` thứ hai nếu fingerprint vẫn khớp.
+  **1.247.3 / 636** và bỏ `AppTarget` của 1.247.1.
 - Kiểm tra lại với APK đích:
   - chuỗi byte `GOLD_OVERRIDE_METHOD` trong `assets/index.android.bundle`,
   - tính duy nhất của `functions_domains` trong bundle Hermes và `classes2.dex`,
@@ -228,13 +229,15 @@ chúng được sinh tự động.
 
 ---
 
-## 9. Quyết định cần có trước khi triển khai
+## 9. Quyết định
 
-1. Chỉ hỗ trợ **1.247.3**, hay giữ cả **1.247.1 và 1.247.3**?
-2. Ưu tiên: **Gold/RC unlock** trước, **spoofer routing** trước, hay
-   **App Check / thao tác ghi** trước?
-3. Spoofer: tiếp tục yêu cầu **máy chủ bên ngoài**, hay cần thêm tuỳ chọn
-   **máy chủ chạy ngay trên thiết bị** (phạm vi lớn hơn đáng kể)?
+- **Đã quyết định**: chỉ hỗ trợ **1.247.3**; bỏ hoàn toàn 1.247.1 khỏi compatibility
+  và khỏi fingerprint của bản vá Gold.
+- Còn cần chốt:
+  1. Ưu tiên: **Gold/RC unlock** trước, **spoofer routing** trước, hay
+     **App Check / thao tác ghi** trước?
+  2. Spoofer: tiếp tục yêu cầu **máy chủ bên ngoài**, hay thêm tuỳ chọn
+     **máy chủ chạy ngay trên thiết bị** (phạm vi lớn hơn đáng kể)?
 
 ---
 
@@ -263,14 +266,13 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
 
 ### Đã hoàn thành — P0
 
-- Tải được XAPK **1.247.3** và **1.247.1** qua `apkeep -d apk-pure` (mục đích nghiên cứu).
-  Base APK của 1.247.3 có SHA-256
-  `31c68eb32b62da951620f914231afc52af8880564aadadc432489b2b21b064de`, khớp chính xác
-  giá trị ghi trong `docs/android-re.md` của kho nguồn.
-- Chứng thư ký của cả hai bản đều có SHA-256
+- Tải XAPK **1.247.3** qua `apkeep -d apk-pure` (mục đích nghiên cứu). Base APK có
+  SHA-256 `31c68eb32b62da951620f914231afc52af8880564aadadc432489b2b21b064de`,
+  khớp chính xác giá trị ghi trong `docs/android-re.md` của kho nguồn.
+- Chứng thư ký có SHA-256
   `f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16`, khớp
   `LOCKET_COMPATIBILITY.signatures`.
-- Xác minh trên cả hai bản:
+- Xác minh trên bản 1.247.3:
   - Hermes bytecode version **96**, magic hợp lệ;
   - `baseUrl` trong `assets/app.config` xuất hiện **đúng 1 lần**;
   - `functions_domains` xuất hiện **đúng 1 lần** trong bundle Hermes và **đúng 1 lần**
@@ -278,20 +280,19 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
   - host RevenueCat / `8-lives-cat.io` nằm trong `classes4.dex`, host Remote Config
     nằm trong `classes3.dex` — đúng giả định của `LocketSpooferServerPatch`.
 - **Phát hiện quan trọng**: bytecode của `androidGoldSubscriptionOverride()` ở 1.247.3
-  **khác** với 1.247.1, nên bản vá Gold cũ sẽ fail nếu chỉ nâng phiên bản.
-  Pattern mới (1.247.3):
+  khác với bản cũ, nên bản vá Gold cũ sẽ fail nếu chỉ nâng phiên bản. Pattern mới:
   `2900002e000002360100015c76005102010037010202c56d730091d353000102005c00`
-  (35 byte, xuất hiện đúng 1 lần). Pattern cũ giữ lại cho 1.247.1.
-- Đã mô phỏng bản vá trên cả hai bundle thật, tính lại SHA-1 footer, rồi dùng
+  (35 byte, xuất hiện đúng 1 lần). Pattern cũ đã được bỏ; chỉ 1.247.3 được hỗ trợ.
+- Đã mô phỏng bản vá trên bundle thật, tính lại SHA-1 footer, rồi dùng
   `hbc-decompiler` để kiểm tra: hàm được decompile thành `r0 = true; return r0;` —
   chứng tỏ stub `LoadConstTrue; Ret` đúng opcode (0x78 / 0x5C).
 
 ### Thay đổi mã nguồn đã áp dụng
 
-- `patches/.../shared/Constants.kt`: bổ sung `AppTarget` **1.247.3 / 636**, giữ
-  1.247.1 / 632; cập nhật comment giải thích hai fingerprint Gold.
-- `patches/.../locket/LocketUnlockGoldPatch.kt`: chấp nhận cả hai pattern bytecode,
-  stub pattern khớp, thông báo lỗi rõ ràng nếu gặp bản khác.
+- `patches/.../shared/Constants.kt`: chỉ còn `AppTarget` **1.247.3 / 636**; target
+  1.247.1 đã bị xoá.
+- `patches/.../locket/LocketUnlockGoldPatch.kt`: chỉ dùng pattern của 1.247.3,
+  thông báo lỗi rõ ràng nếu gặp bản khác.
 - `patches/.../locket/LocketHermes.kt` (mới): gom magic/version/SHA-1/`indexOfSequence`
   dùng chung từ hai bản vá Locket.
 - `patches/.../locket/LocketSpooferServerPatch.kt`: dùng helper dùng chung, bỏ mã trùng.
@@ -304,9 +305,9 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
   command-line tools + `platforms;android-36` + `build-tools;36.0.0` + `platform-tools`.
 - `./gradlew :patches:compileKotlin` và `./gradlew :patches:buildAndroid` đều
   **BUILD SUCCESSFUL**. Artifact: `patches/build/libs/patches-1.8.0.mpp` (~1,4 MB).
-- Đã sinh lại `patches-list.json` và bảng README (cả hai bản vá Locket giờ liệt kê
-  1.247.3 và 1.247.1); script README báo lỗi khi in ký tự ✅ ra console cp1252,
-  nhưng file README đã được ghi đúng trước đó.
+- Đã sinh lại `patches-list.json` và bảng README (chỉ còn **1.247.3** cho Locket);
+  script README báo lỗi khi in ký tự ✅ ra console cp1252, nhưng file README đã được
+  ghi đúng trước đó.
 
 ### Bước tiếp theo
 
