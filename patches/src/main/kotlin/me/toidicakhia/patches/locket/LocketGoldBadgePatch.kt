@@ -3,7 +3,7 @@ package me.toidicakhia.patches.locket
 import app.morphe.patcher.patch.resourcePatch
 import me.toidicakhia.patches.shared.Constants.LOCKET_COMPATIBILITY
 
-private const val PATCH_NAME = "Enable Locket Gold badge"
+private const val PATCH_NAME = "Keep Gold badge toggle state local"
 
 /**
  * Hermes bytecode of the effect closure in useCustomization() (Locket 1.247.3,
