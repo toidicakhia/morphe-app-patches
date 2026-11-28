@@ -755,33 +755,21 @@
           "packageName": "com.anetcapture.mock",
           "name": "HTTP Sniffer",
           "description": null,
-          "apkFileType": "XAPK",
+          "apkFileType": "APKM",
           "appIconColor": "#673AB7",
           "signatures": null,
           "formFactor": "MOBILE",
           "targets": [
             {
-              "version": "2.5.2-ad_mob",
+              "version": "3.0.6-ad_mob",
               "versionCodes": {
-                "ARM64_V8A": 170,
-                "ARMEABI_V7A": 170,
-                "X86_64": 170,
-                "X86": 170
+                "ARM64_V8A": 181,
+                "ARMEABI_V7A": 181,
+                "X86_64": 181,
+                "X86": 181
               },
               "isExperimental": false,
-              "minSdk": null,
-              "description": null
-            },
-            {
-              "version": "2.4.9-ad_mob",
-              "versionCodes": {
-                "ARM64_V8A": 167,
-                "ARMEABI_V7A": 167,
-                "X86_64": 167,
-                "X86": 167
-              },
-              "isExperimental": false,
-              "minSdk": null,
+              "minSdk": 29,
               "description": null
             }
           ]

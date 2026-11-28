@@ -34,21 +34,19 @@ object Constants {
         )
     )
 
-    // HTTP Sniffer 2.5.2-ad_mob (version code 170) and 2.4.9-ad_mob (167, last armv7 build),
-    // distributed as XAPKs.
+    // HTTP Sniffer 3.0.6-ad_mob (version code 181), distributed as an APKCube/APKM
+    // bundle with a base APK plus arm64-v8a and density splits (Android 10+).
+    // All Unlock VIP fingerprints were verified against this exact build.
     val HTTPMOCK_COMPATIBILITY = Compatibility(
         name = "HTTP Sniffer",
         packageName = "com.anetcapture.mock",
-        apkFileType = ApkFileType.XAPK,
+        apkFileType = ApkFileType.APKM,
         appIconColor = 0x673AB7,
         targets = listOf(
             AppTarget(
-                version = "2.5.2-ad_mob",
-                versionCode = 170
-            ),
-            AppTarget(
-                version = "2.4.9-ad_mob",
-                versionCode = 167
+                version = "3.0.6-ad_mob",
+                versionCode = 181,
+                minSdk = 29
             )
         )
     )
