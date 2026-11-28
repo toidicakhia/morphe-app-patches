@@ -19,14 +19,14 @@ private val trustUserCertificatesPatch = resourcePatch(
  *
  * This patch adds that trust and additionally makes the bundled OkHttp pinner
  * and hostname verifier no-ops, so a debugging proxy with any certificate can
- * be used. It is not needed when the spoofer server has a public certificate.
+ * be used.
  */
 @Suppress("unused")
 val locketBypassSslPinningPatch = bytecodePatch(
     name = "Bypass SSL Pinning",
     description = "For TLS debugging: trusts user-installed CA certificates, skips OkHttp " +
         "certificate pinning and accepts any hostname, so a local proxy can inspect HTTPS " +
-        "traffic. Not selected by default and not needed for a normally signed spoofer server.",
+        "traffic. Not selected by default.",
     default = false
 ) {
     compatibleWith(LOCKET_COMPATIBILITY)

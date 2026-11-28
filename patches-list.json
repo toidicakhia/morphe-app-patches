@@ -38,7 +38,7 @@
     },
     {
       "name": "Bypass SSL Pinning",
-      "description": "For TLS debugging: trusts user-installed CA certificates, skips OkHttp certificate pinning and accepts any hostname, so a local proxy can inspect HTTPS traffic. Not selected by default and not needed for a normally signed spoofer server.",
+      "description": "For TLS debugging: trusts user-installed CA certificates, skips OkHttp certificate pinning and accepts any hostname, so a local proxy can inspect HTTPS traffic. Not selected by default.",
       "default": false,
       "category": null,
       "compatiblePackages": [
@@ -301,77 +301,6 @@
       "options": []
     },
     {
-      "name": "Remote Config overrides",
-      "description": "Forces selected client-side Remote Config flags regardless of what Locket's server returns. Recaptcha and history ads can be turned off; the Gold subscribe button and beta features can be turned on. Server-enforced features are unaffected.",
-      "default": false,
-      "category": null,
-      "compatiblePackages": [
-        {
-          "packageName": "com.locket.Locket",
-          "name": "Locket Widget",
-          "description": null,
-          "apkFileType": "XAPK",
-          "appIconColor": "#FFB201",
-          "signatures": [
-            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
-          ],
-          "formFactor": "MOBILE",
-          "targets": [
-            {
-              "version": "1.247.3",
-              "versionCodes": {
-                "ARM64_V8A": 636,
-                "ARMEABI_V7A": 636,
-                "X86_64": 636,
-                "X86": 636
-              },
-              "isExperimental": false,
-              "minSdk": 27,
-              "description": null
-            }
-          ]
-        }
-      ],
-      "options": [
-        {
-          "key": "disableRecaptcha",
-          "title": "Disable recaptcha gates",
-          "description": "Forces the six android_*_recaptcha_enabled getters to false. Backend checks, if any, are not affected.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        },
-        {
-          "key": "disableHistoryAds",
-          "title": "Disable history ads",
-          "description": "Forces android_history_ads_enabled to false.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        },
-        {
-          "key": "enableSubscribeGoldButton",
-          "title": "Show Gold subscribe button",
-          "description": "Forces android_subscribe_gold_button_enabled to true.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        },
-        {
-          "key": "enableBetaFeatures",
-          "title": "Enable beta features",
-          "description": "Forces beta_features_enabled to true.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        }
-      ]
-    },
-    {
       "name": "Remove Ad ID Permissions",
       "description": "Removes the advertising ID, Privacy Sandbox ad-services and Play install-referrer permissions. Device identification used for device management is left untouched.",
       "default": true,
@@ -580,95 +509,6 @@
         }
       ],
       "options": []
-    },
-    {
-      "name": "Spoofer server",
-      "description": "Sends Locket's API traffic (feed, profile, moments, overlays) to a self-hosted spoofer server instead of api.locketcamera.com. Enter the server address; the app keeps using the server's own HTTPS certificate, so no DNS profile or CA install is needed. Other hosts are opt-in. Not selected by default.",
-      "default": false,
-      "category": null,
-      "compatiblePackages": [
-        {
-          "packageName": "com.locket.Locket",
-          "name": "Locket Widget",
-          "description": null,
-          "apkFileType": "XAPK",
-          "appIconColor": "#FFB201",
-          "signatures": [
-            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
-          ],
-          "formFactor": "MOBILE",
-          "targets": [
-            {
-              "version": "1.247.3",
-              "versionCodes": {
-                "ARM64_V8A": 636,
-                "ARMEABI_V7A": 636,
-                "X86_64": 636,
-                "X86": 636
-              },
-              "isExperimental": false,
-              "minSdk": 27,
-              "description": null
-            }
-          ]
-        }
-      ],
-      "options": [
-        {
-          "key": "spooferServer",
-          "title": "Spoofer server",
-          "description": "Address of the spoofer server, for example https://spoofer.example. It must answer HTTPS with a certificate for this name. A scheme is optional and is assumed to be https when missing; a path is not supported.",
-          "required": true,
-          "type": "kotlin.String",
-          "default": null,
-          "values": null
-        },
-        {
-          "key": "routeRevenueCat",
-          "title": "Route RevenueCat",
-          "description": "Sends api.revenuecat.com and api-production.8-lives-cat.io to the spoofer server so its Gold payload reaches the app. The server must answer /v1/subscribers* and /v1/receipts*. Rebuilds a dex file.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        },
-        {
-          "key": "routeRemoteConfig",
-          "title": "Route Firebase Remote Config",
-          "description": "Sends firebaseremoteconfig.googleapis.com/v1/projects/...:fetch to the spoofer server so its feature flags reach the app. The realtime stream is left on Google; it only triggers re-fetches. Rebuilds a dex file.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        },
-        {
-          "key": "routeCdn",
-          "title": "Route CDN",
-          "description": "Points cdn.locketcamera.com at the same server for overlay and sticker images. The server must serve the same paths under /.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        },
-        {
-          "key": "routeGroupsWebsocket",
-          "title": "Route groups WebSocket",
-          "description": "Points wss://api.locketcamera.com/wss_v2/groups at the same host over wss. Only enable this when the server actually terminates WebSocket connections.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        },
-        {
-          "key": "trustUserCertificates",
-          "title": "Trust user certificates",
-          "description": "Adds a network security config that trusts user-installed CAs, for local MITM deployments. Not needed when the spoofer has its own public HTTPS certificate.",
-          "required": false,
-          "type": "kotlin.Boolean",
-          "default": false,
-          "values": null
-        }
-      ]
     },
     {
       "name": "Trust User Certificates",
