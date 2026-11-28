@@ -296,12 +296,20 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
   dùng chung từ hai bản vá Locket.
 - `patches/.../locket/LocketSpooferServerPatch.kt`: dùng helper dùng chung, bỏ mã trùng.
 
-### Chưa làm được / bước tiếp theo
+### Build (đã hoàn thành)
 
-- **Build chưa chạy được**: Gradle không resolve plugin `app.morphe.patches:2.0.0`
-  vì thiếu thông tin đăng nhập GitHub Packages (`read:packages`). Cần cung cấp
-  `GITHUB_ACTOR` / `GITHUB_TOKEN` (hoặc `gpr.user` / `gpr.key`) rồi chạy lại
-  `./gradlew :patches:compileKotlin` và `./gradlew :patches:buildAndroid`.
-- Sau khi build được: sinh lại `patches-list.json` / README, rồi tiếp tục P1–P4
-  theo thứ tự ưu tiên đã nêu ở mục 9.
-- Chưa cài đặt thử trên thiết bị; cần kiểm tra thực tế sau khi có artifact patch.
+- Dùng token GitHub CLI (`gh auth token`, tài khoản `toidicakhia`, có scope
+  `write:packages`) làm `GITHUB_TOKEN` cho Gradle; không lưu token vào repo.
+- Cài Android SDK vào `C:\Android\android-sdk` (đúng `ANDROID_HOME` có sẵn):
+  command-line tools + `platforms;android-36` + `build-tools;36.0.0` + `platform-tools`.
+- `./gradlew :patches:compileKotlin` và `./gradlew :patches:buildAndroid` đều
+  **BUILD SUCCESSFUL**. Artifact: `patches/build/libs/patches-1.8.0.mpp` (~1,4 MB).
+- Đã sinh lại `patches-list.json` và bảng README (cả hai bản vá Locket giờ liệt kê
+  1.247.3 và 1.247.1); script README báo lỗi khi in ký tự ✅ ra console cp1252,
+  nhưng file README đã được ghi đúng trước đó.
+
+### Bước tiếp theo
+
+- Tiếp tục P1–P4 theo thứ tự ưu tiên đã nêu ở mục 9.
+- Chưa cài đặt thử trên thiết bị; cần apply `patches-1.8.0.mpp` qua Morphe
+  CLI/Desktop và smoke-test khi có thiết bị.
