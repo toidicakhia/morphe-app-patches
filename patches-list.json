@@ -1,6 +1,6 @@
 {
   "NOTE": "Do NOT manually edit this file. Regenerate it with ./gradlew :patches:generatePatchesList. Manually editing this file can break third party tools that use this file.",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "patches": [
     {
       "name": "Block Product Ad Banners",
