@@ -27,7 +27,7 @@ updated fingerprints before a patch can be applied.
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.8.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.8.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;22 patches total
+> **[v1.8.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.8.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;24 patches total
 <details open>
 <summary><img src=".github/assets/apps/vn.vtv.vtvgo.png" alt="" height="20"> VTVGo&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
@@ -116,7 +116,7 @@ updated fingerprints before a patch can be applied.
 </details>
 
 <details open>
-<summary><img src=".github/assets/apps/com.locket.Locket.png" alt="" height="20"> Locket Widget&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
+<summary><img src=".github/assets/apps/com.locket.Locket.png" alt="" height="20"> Locket Widget&nbsp;&nbsp;•&nbsp;&nbsp;4 patches</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -126,8 +126,10 @@ updated fingerprints before a patch can be applied.
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
-| [Spoofer server](#spoofer-server) | Sends Locket's API traffic (feed, profile, AI frames, captions) to a self-hosted spoofer server instead of api.locketcamera.com. Enter the server address; the app keeps using the server's own HTTPS certificate, so no DNS profile or CA install is needed. Enable the second option to route RevenueCat and Firebase Remote Config through the same server as well. Not selected by default. | • Spoofer server<br>• Route RevenueCat and Remote Config |
-| [Unlock Locket Gold](#unlock-locket-gold) | Makes the app treat the signed-in account as a Locket Gold subscriber, enabling the Gold-only feature gates and replacing the paywall with subscription management. Client-side only: features validated by Locket's servers still need a real subscription. |  |
+| [Disable App Check](#disable-app-check) | Stubs the React Native Firebase App Check activation wrappers so the app no longer requests an attestation token. Best effort: server-side enforcement of X-Firebase-AppCheck on writes and media uploads is unaffected. |  |
+| [Remote Config overrides](#remote-config-overrides) | Forces selected client-side Remote Config flags regardless of what Locket's server returns. Recaptcha and history ads can be turned off; the Gold subscribe button and beta features can be turned on. Server-enforced features are unaffected. | • Disable recaptcha gates<br>• Disable history ads<br>• Show Gold subscribe button<br>• Enable beta features |
+| [Spoofer server](#spoofer-server) | Sends Locket's API traffic (feed, profile, moments, overlays) to a self-hosted spoofer server instead of api.locketcamera.com. Enter the server address; the app keeps using the server's own HTTPS certificate, so no DNS profile or CA install is needed. Other hosts are opt-in. Not selected by default. | • Spoofer server<br>• Route RevenueCat<br>• Route Firebase Remote Config<br>• Route CDN<br>• Route groups WebSocket<br>• Trust user certificates |
+| [Unlock Locket Gold](#unlock-locket-gold) | Makes the app treat the signed-in account as a Locket Gold subscriber, enabling the Gold-only feature gates and replacing the paywall with subscription management. Client-side only: features validated by Locket's servers still need a real subscription. | • Force feature gates |
 
 </details>
 

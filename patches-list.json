@@ -235,6 +235,40 @@
       "options": []
     },
     {
+      "name": "Disable App Check",
+      "description": "Stubs the React Native Firebase App Check activation wrappers so the app no longer requests an attestation token. Best effort: server-side enforcement of X-Firebase-AppCheck on writes and media uploads is unaffected.",
+      "default": false,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.locket.Locket",
+          "name": "Locket Widget",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#FFB201",
+          "signatures": [
+            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.247.3",
+              "versionCodes": {
+                "ARM64_V8A": 636,
+                "ARMEABI_V7A": 636,
+                "X86_64": 636,
+                "X86": 636
+              },
+              "isExperimental": false,
+              "minSdk": 27,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Disable SSL Pinning",
       "description": "Bypasses OkHttp certificate pinning on Cloudflare API calls to allow TLS traffic inspection.",
       "default": false,
@@ -265,6 +299,77 @@
         }
       ],
       "options": []
+    },
+    {
+      "name": "Remote Config overrides",
+      "description": "Forces selected client-side Remote Config flags regardless of what Locket's server returns. Recaptcha and history ads can be turned off; the Gold subscribe button and beta features can be turned on. Server-enforced features are unaffected.",
+      "default": false,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.locket.Locket",
+          "name": "Locket Widget",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#FFB201",
+          "signatures": [
+            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.247.3",
+              "versionCodes": {
+                "ARM64_V8A": 636,
+                "ARMEABI_V7A": 636,
+                "X86_64": 636,
+                "X86": 636
+              },
+              "isExperimental": false,
+              "minSdk": 27,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": [
+        {
+          "key": "disableRecaptcha",
+          "title": "Disable recaptcha gates",
+          "description": "Forces the six android_*_recaptcha_enabled getters to false. Backend checks, if any, are not affected.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "disableHistoryAds",
+          "title": "Disable history ads",
+          "description": "Forces android_history_ads_enabled to false.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "enableSubscribeGoldButton",
+          "title": "Show Gold subscribe button",
+          "description": "Forces android_subscribe_gold_button_enabled to true.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "enableBetaFeatures",
+          "title": "Enable beta features",
+          "description": "Forces beta_features_enabled to true.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        }
+      ]
     },
     {
       "name": "Remove Ad ID Permissions",
@@ -434,7 +539,7 @@
     },
     {
       "name": "Spoofer server",
-      "description": "Sends Locket's API traffic (feed, profile, AI frames, captions) to a self-hosted spoofer server instead of api.locketcamera.com. Enter the server address; the app keeps using the server's own HTTPS certificate, so no DNS profile or CA install is needed. Enable the second option to route RevenueCat and Firebase Remote Config through the same server as well. Not selected by default.",
+      "description": "Sends Locket's API traffic (feed, profile, moments, overlays) to a self-hosted spoofer server instead of api.locketcamera.com. Enter the server address; the app keeps using the server's own HTTPS certificate, so no DNS profile or CA install is needed. Other hosts are opt-in. Not selected by default.",
       "default": false,
       "category": null,
       "compatiblePackages": [
@@ -476,8 +581,44 @@
         },
         {
           "key": "routeRevenueCat",
-          "title": "Route RevenueCat and Remote Config",
-          "description": "Also sends api.revenuecat.com and firebaseremoteconfig.googleapis.com to the spoofer server, so its Gold payload and feature flags reach the app without a DNS profile. The server must answer /v1/subscribers*, /v1/receipts* and /v1/projects*. Rebuilding the app's dex files makes patching take noticeably longer.",
+          "title": "Route RevenueCat",
+          "description": "Sends api.revenuecat.com and api-production.8-lives-cat.io to the spoofer server so its Gold payload reaches the app. The server must answer /v1/subscribers* and /v1/receipts*. Rebuilds a dex file.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "routeRemoteConfig",
+          "title": "Route Firebase Remote Config",
+          "description": "Sends firebaseremoteconfig.googleapis.com/v1/projects/...:fetch to the spoofer server so its feature flags reach the app. The realtime stream is left on Google; it only triggers re-fetches. Rebuilds a dex file.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "routeCdn",
+          "title": "Route CDN",
+          "description": "Points cdn.locketcamera.com at the same server for overlay and sticker images. The server must serve the same paths under /.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "routeGroupsWebsocket",
+          "title": "Route groups WebSocket",
+          "description": "Points wss://api.locketcamera.com/wss_v2/groups at the same host over wss. Only enable this when the server actually terminates WebSocket connections.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": false,
+          "values": null
+        },
+        {
+          "key": "trustUserCertificates",
+          "title": "Trust user certificates",
+          "description": "Adds a network security config that trusts user-installed CAs, for local MITM deployments. Not needed when the spoofer has its own public HTTPS certificate.",
           "required": false,
           "type": "kotlin.Boolean",
           "default": false,
@@ -551,7 +692,17 @@
           ]
         }
       ],
-      "options": []
+      "options": [
+        {
+          "key": "forceFeatureGates",
+          "title": "Force feature gates",
+          "description": "Also stub androidFeatureGatesOverride() to true, so client-side feature gates follow the Gold state even when Remote Config disagrees.",
+          "required": false,
+          "type": "kotlin.Boolean",
+          "default": true,
+          "values": null
+        }
+      ]
     },
     {
       "name": "Unlock Plus",

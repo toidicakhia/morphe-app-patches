@@ -53,15 +53,17 @@ Phạm vi của tài liệu này là lập kế hoạch; chưa thay đổi mã n
 
 ### 2.2 Kho bản vá (`D:\morphe-app-patches`)
 
-Đã có hai bản vá cho Locket, nằm trong
+Hiện có bốn bản vá cho Locket, nằm trong
 `patches/src/main/kotlin/me/toidicakhia/patches/locket/`:
 
 | File | Chức năng |
 |---|---|
-| `LocketUnlockGoldPatch.kt` | Thay bytecode Hermes của `androidGoldSubscriptionOverride()` bằng `LoadConstTrue; Ret`, biến flag `android_gold_subscription_override` thành `true`. |
-| `LocketSpooferServerPatch.kt` | Đổi `extra.api.baseUrl` trong `assets/app.config`, đổi tên khoá RC `functions_domains` → `functions_domainz` trong bundle Hermes và `classes2.dex`, tuỳ chọn chuyển hướng RevenueCat và Remote Config. |
+| `LocketUnlockGoldPatch.kt` | Stub `androidGoldSubscriptionOverride()` (và tuỳ chọn `androidFeatureGatesOverride()`) thành `LoadConstTrue; Ret`. |
+| `LocketSpooferServerPatch.kt` | Chuyển hướng host API / RevenueCat / Remote Config / CDN / groups WebSocket; đổi tên khoá RC `functions_domains`; tuỳ chọn tin user CA. |
+| `LocketAppCheckPatch.kt` | Stub ba wrapper khởi tạo App Check của React Native Firebase. |
+| `LocketRemoteConfigPatch.kt` | Ép giá trị một số flag RC phía client (recaptcha, history ads, Gold button, beta features). |
 
-Cả hai đều khai báo `compatibleWith(LOCKET_COMPATIBILITY)`, hiện đã được chuyển
+Tất cả đều khai báo `compatibleWith(LOCKET_COMPATIBILITY)`, hiện đã được chuyển
 sang **1.247.3 / versionCode 636** trong
 `patches/src/main/kotlin/me/toidicakhia/patches/shared/Constants.kt`, khớp với bản
 mà tài liệu nghiên cứu phân tích. Phiên bản 1.247.1 đã bị loại bỏ khỏi danh sách hỗ trợ.
@@ -102,74 +104,67 @@ Nguyên tắc: nếu một tính năng bắt buộc phải có máy chủ, bản
 
 ---
 
-## 5. Các bản vá đề xuất
+## 5. Các bản vá đã triển khai
 
-### P0 — Căn chỉnh phiên bản (việc bắt buộc làm đầu)
+### P0 — Căn chỉnh phiên bản (xong)
 
-- Cập nhật `LOCKET_COMPATIBILITY` trong
-  `patches/src/main/kotlin/me/toidicakhia/patches/shared/Constants.kt` lên
-  **1.247.3 / 636** và bỏ `AppTarget` của 1.247.1.
-- Kiểm tra lại với APK đích:
-  - chuỗi byte `GOLD_OVERRIDE_METHOD` trong `assets/index.android.bundle`,
-  - tính duy nhất của `functions_domains` trong bundle Hermes và `classes2.dex`,
-  - bốn hằng chuỗi host trong `classes3.dex` / `classes4.dex`,
-  - phiên bản bytecode Hermes 96.
-- Hiện không có APK trong workspace. Cần tải đúng bản (ví dụ
-  `apkeep -a com.locket.Locket -d apk-pure`, theo `docs/android-re.md`) và đối chiếu
-  SHA-256 ghi tại `docs/android-re.md:27-29`.
+- `LOCKET_COMPATIBILITY` trong `patches/.../shared/Constants.kt` chỉ còn
+  **1.247.3 / 636**; target 1.247.1 đã bị xoá.
+- Đã tải XAPK 1.247.3 thật và xác minh: SHA-256 base APK khớp tài liệu nghiên cứu,
+  chứng thư ký khớp hash đã pin, Hermes v96, `baseUrl` / `functions_domains` và
+  các host trong dex đều xuất hiện đúng một lần.
 
-### P1 — Mở rộng "Unlock Locket Gold"
+### P1 — Unlock Locket Gold (xong)
 
-- File: `patches/src/main/kotlin/me/toidicakhia/patches/locket/LocketUnlockGoldPatch.kt`.
-- Giữ nguyên stub bytecode hiện có; thêm tuỳ chọn để ép
-  `android_feature_gates_override = true` và overlay các khoá RC liên quan Gold
-  từ `D:\LocketWidget\server\rc_overrides.json`.
-- Làm rõ mô tả bản vá: chỉ mở cổng phía client; AI/referral vẫn cần server.
+- `LocketUnlockGoldPatch.kt` thêm tuỳ chọn `forceFeatureGates` (mặc định bật):
+  stub luôn bytecode của `androidFeatureGatesOverride()` thành `return true`.
+- Việc overlay tuỳ ý các khoá từ `rc_overrides.json` không thực hiện ở P1; nó được
+  thay bằng P4 (ép getter) và P2 (điều hướng RC tới spoofer để lấy giá trị bất kỳ).
 
-### P2 — Mở rộng "Spoofer server"
+### P2 — Spoofer server (xong)
 
-- File: `patches/src/main/kotlin/me/toidicakhia/patches/locket/LocketSpooferServerPatch.kt`.
-- Thay cặp "URL + 2 toggle" bằng các tuỳ chọn route riêng: API
-  (`api.locketcamera.com`), RevenueCat, Remote Config, Cloud Functions,
-  CDN (`cdn.locketcamera.com`) và WebSocket nhóm (`wss://api.locketcamera.com/wss_v2/groups`).
-- Giữ mặc định an toàn (chỉ API) và kiểm tra đầu vào hiện tại: HTTPS bắt buộc,
-  không có path, không có credentials.
-- Thêm tuỳ chọn "Trust user certificates" cho triển khai MITM nội bộ; tái dùng
-  cách sửa `res/xml/network_security_config.xml` trong
-  `patches/.../vtvgo/VtvgoPrivacyPatches.kt:108-139`, nhưng phải xác nhận file này
-  thực sự tồn tại trong APK Locket.
-- Lưu ý: relay spoofer hiện tại là HTTP-only; route WebSocket chỉ bật khi máy chủ hỗ trợ.
+- `LocketSpooferServerPatch.kt` có các tuỳ chọn: `spooferServer`,
+  `routeRevenueCat`, `routeRemoteConfig`, `routeCdn`, `routeGroupsWebsocket`,
+  `trustUserCertificates`. Mặc định chỉ chuyển hướng API.
+- Ngoài `app.config`, bản vá còn đổi host `https://api.locketcamera.com` trong
+  `classes2.dex`, host RevenueCat trong `classes4.dex` và host Remote Config trong
+  `classes3.dex`.
+- APK Locket **không có** `res/xml/network_security_config.xml`; bản vá tạo file này
+  và thêm `android:networkSecurityConfig` vào `<application>` khi bật tuỳ chọn tin user CA.
+- Relay spoofer hiện tại là HTTP-only; route WebSocket chỉ nên bật khi server hỗ trợ wss.
 
-### P3 — "Disable App Check" (bản vá mới)
+### P3 — Disable App Check (xong)
 
-- File dự kiến: `patches/src/main/kotlin/me/toidicakhia/patches/locket/LocketAppCheckPatch.kt`.
-- Ghi đè `android_appcheck_enabled` / `app_check_enabled` trong giá trị mặc định RC;
-  nếu cần, hook provider attestation native để bỏ header `X-Firebase-AppCheck`.
-- Ghi rõ trong mô tả: thao tác ghi/upload do server kiểm soát vẫn có thể bị từ chối.
+- Không tồn tại flag RC `android_appcheck_enabled`. Bản vá mới
+  `LocketAppCheckPatch.kt` stub ba wrapper khởi tạo: `initAppCheck`,
+  `initAppCheckRecaptcha` và `initializeAppCheck`.
+- Các hàm lấy token được giữ nguyên vì phải trả về chuỗi, không phải boolean.
+- Đây là biện pháp best effort: backend vẫn có thể tự enforce `X-Firebase-AppCheck`.
 
-### P4 — "Remote Config overlay" (bản vá mới)
+### P4 — Remote Config overrides (xong)
 
-- File dự kiến: `patches/src/main/kotlin/me/toidicakhia/patches/locket/LocketRemoteConfigPatch.kt`.
-- Chèn các mục chọn lọc từ `server/rc-live-android-1.247.3.json` và
-  `server/rc_overrides.json` vào defaults đóng gói.
-- Giữ quy tắc bỏ qua `camera_filter_config` / `picker_filters` để bảng Looks native
-  không bị hỏng, kèm bản sửa độ trễ shutter theo `docs/android-re.md:281-414`.
+- RC defaults không nằm trong SLP object mà được gán lúc chạy bằng
+  `PutNewOwnById`, nên không thể đảo một tag boolean trong file. Bản vá mới
+  `LocketRemoteConfigPatch.kt` stub trực tiếp các getter đã xác minh pattern:
+  sáu flag recaptcha → false, `android_history_ads_enabled` → false,
+  `android_subscribe_gold_button_enabled` → true, `beta_features_enabled` → true.
+- Giá trị RC tuỳ ý (kể cả `camera_filter_config` / `picker_filters`) vẫn nên lấy
+  qua máy chủ spoofer ở P2 thay vì đưa vào patch.
 
-### P5 — "AI / Caption relay" (tuỳ điều kiện)
+### P5 — AI / Caption relay (xong thông qua P2)
 
-- Chỉ triển khai sau khi đối chiếu `docs/api-registry.txt` để xác nhận tên callable
-  nào thực sự tồn tại trong 1.247.3 (đã xác nhận: `getMomentOverlayData`;
-  `generateCaption` / `backendCaptions` cần kiểm tra kỹ).
-- Dùng lại cấu trúc phản hồi trong `server/proxy_locket_api.py` và chỉ cần route
-  tới spoofer nếu bản thân endpoint đã tồn tại.
+- Trong 1.247.3 chỉ có `getMomentOverlayData` là callable liên quan AI/caption;
+  `generateCaption`, `backendCaptions`, `createFilter`, `generateFilteredImage`
+  đều có số lần xuất hiện **0** trong bundle và registry.
+- Vì tất cả callable đi qua `api.baseUrl`, P2 đã chuyển hướng `getMomentOverlayData`
+  tới spoofer. Không cần bản vá riêng cho P5.
 
-### Tái cấu trúc dùng chung
+### Dùng chung
 
-Tách phần lặp lại (magic Hermes, kiểm tra phiên bản, tính lại SHA-1 footer, tiện ích dex)
-từ hai bản vá hiện có sang:
-
-- `patches/src/main/kotlin/me/toidicakhia/patches/locket/LocketHermes.kt`
-- `patches/src/main/kotlin/me/toidicakhia/patches/locket/LocketFingerprints.kt`
+- `patches/src/main/kotlin/me/toidicakhia/patches/locket/LocketHermes.kt` chứa
+  `requireHermes96`, `rehashHermes`, `indexOfSequence` và `stubHermesBoolGetter`.
+- `LocketFingerprints.kt` không được tạo: mỗi bản vá giữ fingerprint riêng ngay
+  trong file của nó cho dễ đối chiếu với từng bản APK.
 
 ---
 
@@ -177,13 +172,11 @@ từ hai bản vá hiện có sang:
 
 ```
 patches/src/main/kotlin/me/toidicakhia/patches/locket/
-├── LocketHermes.kt                  (mới, dùng chung)
-├── LocketFingerprints.kt            (mới, dùng chung)
+├── LocketHermes.kt                  (dùng chung)
 ├── LocketUnlockGoldPatch.kt         (mở rộng — P1)
 ├── LocketSpooferServerPatch.kt      (mở rộng — P2)
-├── LocketAppCheckPatch.kt           (mới — P3)
-├── LocketRemoteConfigPatch.kt       (mới — P4)
-└── LocketAiRelayPatch.kt            (mới, tuỳ điều kiện — P5)
+├── LocketAppCheckPatch.kt           (P3)
+└── LocketRemoteConfigPatch.kt       (P4)
 
 patches/src/main/kotlin/me/toidicakhia/patches/shared/Constants.kt   (P0)
 docs/locket-android-port-plan.md                                    (tài liệu này)
@@ -231,13 +224,13 @@ chúng được sinh tự động.
 
 ## 9. Quyết định
 
-- **Đã quyết định**: chỉ hỗ trợ **1.247.3**; bỏ hoàn toàn 1.247.1 khỏi compatibility
-  và khỏi fingerprint của bản vá Gold.
+- **Đã quyết định**: chỉ hỗ trợ **1.247.3**; bỏ hoàn toàn 1.247.1.
+- **Đã triển khai**: P0–P5 (Gold + feature gates, spoofer routing, App Check,
+  RC overrides, AI/caption relay thông qua routing).
 - Còn cần chốt:
-  1. Ưu tiên: **Gold/RC unlock** trước, **spoofer routing** trước, hay
-     **App Check / thao tác ghi** trước?
-  2. Spoofer: tiếp tục yêu cầu **máy chủ bên ngoài**, hay thêm tuỳ chọn
-     **máy chủ chạy ngay trên thiết bị** (phạm vi lớn hơn đáng kể)?
+  1. Có cần máy chủ spoofer **chạy ngay trên thiết bị** không (phạm vi lớn hơn nhiều)?
+  2. Chạy smoke-test trên thiết bị thật (đã xác minh bằng CLI + Android SDK,
+     chưa cài trên máy).
 
 ---
 
@@ -287,17 +280,31 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
   `hbc-decompiler` để kiểm tra: hàm được decompile thành `r0 = true; return r0;` —
   chứng tỏ stub `LoadConstTrue; Ret` đúng opcode (0x78 / 0x5C).
 
+### P1–P5 (đã hoàn thành)
+
+- **P1**: `Unlock Locket Gold` có thêm `forceFeatureGates` (mặc định bật) stub
+  `androidFeatureGatesOverride()`.
+- **P2**: `Spoofer server` có thêm route riêng cho RevenueCat, Remote Config, CDN,
+  groups WebSocket, đổi luôn host API trong `classes2.dex`, và tạo
+  `network_security_config.xml` khi bật tin user CA.
+- **P3**: bản vá mới `Disable App Check` stub ba wrapper khởi tạo App Check;
+  không đụng vào hàm lấy token.
+- **P4**: bản vá mới `Remote Config overrides` ép 6 flag recaptcha + history ads
+  thành false, Gold button + beta features thành true.
+- **P5**: chỉ `getMomentOverlayData` tồn tại trong 1.247.3; đã được chuyển hướng
+  sẵn qua API baseUrl ở P2. Không cần patch riêng.
+
 ### Thay đổi mã nguồn đã áp dụng
 
-- `patches/.../shared/Constants.kt`: chỉ còn `AppTarget` **1.247.3 / 636**; target
-  1.247.1 đã bị xoá.
-- `patches/.../locket/LocketUnlockGoldPatch.kt`: chỉ dùng pattern của 1.247.3,
-  thông báo lỗi rõ ràng nếu gặp bản khác.
-- `patches/.../locket/LocketHermes.kt` (mới): gom magic/version/SHA-1/`indexOfSequence`
-  dùng chung từ hai bản vá Locket.
-- `patches/.../locket/LocketSpooferServerPatch.kt`: dùng helper dùng chung, bỏ mã trùng.
+- `patches/.../shared/Constants.kt`: chỉ còn `AppTarget` **1.247.3 / 636**.
+- `patches/.../locket/LocketHermes.kt` *(mới)*: helper Hermes dùng chung, gồm
+  `stubHermesBoolGetter()` với opcode `0x78` (true) / `0x79` (false).
+- `patches/.../locket/LocketUnlockGoldPatch.kt`: pattern 1.247.3 + tuỳ chọn feature gates.
+- `patches/.../locket/LocketSpooferServerPatch.kt`: routing theo từng host.
+- `patches/.../locket/LocketAppCheckPatch.kt` *(mới)*.
+- `patches/.../locket/LocketRemoteConfigPatch.kt` *(mới)*.
 
-### Build (đã hoàn thành)
+### Build và apply (đã hoàn thành)
 
 - Dùng token GitHub CLI (`gh auth token`, tài khoản `toidicakhia`, có scope
   `write:packages`) làm `GITHUB_TOKEN` cho Gradle; không lưu token vào repo.
@@ -305,12 +312,22 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
   command-line tools + `platforms;android-36` + `build-tools;36.0.0` + `platform-tools`.
 - `./gradlew :patches:compileKotlin` và `./gradlew :patches:buildAndroid` đều
   **BUILD SUCCESSFUL**. Artifact: `patches/build/libs/patches-1.8.0.mpp` (~1,4 MB).
-- Đã sinh lại `patches-list.json` và bảng README (chỉ còn **1.247.3** cho Locket);
-  script README báo lỗi khi in ký tự ✅ ra console cp1252, nhưng file README đã được
-  ghi đúng trước đó.
+- Đã sinh lại `patches-list.json` và bảng README (giờ có 4 bản vá Locket, chỉ
+  hỗ trợ **1.247.3**); script README báo lỗi khi in ✅ ra console cp1252 nhưng file
+  đã được ghi đúng trước đó.
+
+### Kiểm chứng apply
+
+- Tải `morphe-desktop-2.4.0-all.jar` và apply **cả 4 bản vá với mọi tuỳ chọn bật**
+  vào XAPK 1.247.3 thật, với `--validate --verify-with-sdk` → **thành công**.
+- Giải nén APK đã vá và kiểm tra:
+  - `app.config`: `baseUrl`, `groupsWebsocketUrl`, `defaultBasePath` đều trỏ tới spoofer;
+  - dex: API host trong `classes2`, RevenueCat trong `classes4`, Remote Config
+    trong `classes3` đều được thay; `functions_domains` biến mất;
+  - `network_security_config.xml` tồn tại và manifest có `android:networkSecurityConfig`;
+  - tất cả 13 hàm đã stub có opcode đầu `0x78` (true) hoặc `0x79` (false) đúng kỳ vọng.
 
 ### Bước tiếp theo
 
-- Tiếp tục P1–P4 theo thứ tự ưu tiên đã nêu ở mục 9.
-- Chưa cài đặt thử trên thiết bị; cần apply `patches-1.8.0.mpp` qua Morphe
-  CLI/Desktop và smoke-test khi có thiết bị.
+- Smoke-test trên thiết bị thật: UI Gold, flag RC, log request tới spoofer, đăng ảnh.
+- Quyết định có cần spoofer chạy ngay trên thiết bị hay không.

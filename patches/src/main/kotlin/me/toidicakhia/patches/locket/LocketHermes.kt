@@ -43,3 +43,30 @@ internal fun ByteArray.indexOfSequence(sequence: ByteArray, startIndex: Int = 0)
     }
     return -1
 }
+
+/**
+ * Replaces a unique Hermes function body with `LoadConstTrue/False; Ret` and
+ * fills the rest of the body with Unreachable (0x00). Recomputes the footer hash.
+ */
+internal fun ByteArray.stubHermesBoolGetter(
+    pattern: ByteArray,
+    value: Boolean,
+    label: String
+) {
+    val offset = indexOfSequence(pattern)
+    if (offset == -1) {
+        throw PatchException("Could not locate $label in $HERMES_BUNDLE_PATH.")
+    }
+    if (indexOfSequence(pattern, offset + 1) != -1) {
+        throw PatchException("$label is not unique in $HERMES_BUNDLE_PATH.")
+    }
+
+    val stub = if (value) {
+        byteArrayOf(0x78, 0x00, 0x5C, 0x00)
+    } else {
+        byteArrayOf(0x79, 0x00, 0x5C, 0x00)
+    }
+    stub.copyInto(this, offset)
+    fill(0x00, offset + stub.size, offset + pattern.size)
+    rehashHermes()
+}

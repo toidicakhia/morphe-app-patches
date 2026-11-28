@@ -1,6 +1,6 @@
 package me.toidicakhia.patches.locket
 
-import app.morphe.patcher.patch.PatchException
+import app.morphe.patcher.patch.booleanOption
 import app.morphe.patcher.patch.resourcePatch
 import me.toidicakhia.patches.shared.Constants.LOCKET_COMPATIBILITY
 
@@ -23,8 +23,9 @@ private const val PATCH_NAME = "Unlock Locket Gold"
 private val GOLD_OVERRIDE_METHOD =
     "2900002e000002360100015c76005102010037010202c56d730091d353000102005c00".hexToByteArray()
 
-// LoadConstTrue r0; Ret r0 — the remaining bytes are filled with Unreachable (0x00).
-private val RETURN_TRUE_STUB = byteArrayOf(0x78, 0x00, 0x5C, 0x00)
+/** androidFeatureGatesOverride() in the same build. */
+private val FEATURE_GATES_OVERRIDE_METHOD =
+    "2900002e000002360100015c76005102010037010202c56d730084d353000102005c00".hexToByteArray()
 
 @Suppress("unused")
 val locketUnlockGoldPatch = resourcePatch(
@@ -36,25 +37,32 @@ val locketUnlockGoldPatch = resourcePatch(
     default = true
 ) {
     compatibleWith(LOCKET_COMPATIBILITY)
+
+    val forceFeatureGates by booleanOption(
+        key = "forceFeatureGates",
+        default = true,
+        title = "Force feature gates",
+        description = "Also stub androidFeatureGatesOverride() to true, so client-side feature " +
+            "gates follow the Gold state even when Remote Config disagrees."
+    )
+
     execute {
         val bundle = get(HERMES_BUNDLE_PATH)
         val bytecode = bundle.readBytes()
         bytecode.requireHermes96(HERMES_BUNDLE_PATH)
 
-        val offset = bytecode.indexOfSequence(GOLD_OVERRIDE_METHOD)
-        if (offset == -1) {
-            throw PatchException(
-                "$PATCH_NAME: could not locate androidGoldSubscriptionOverride in $HERMES_BUNDLE_PATH. " +
-                    "This patch supports Locket 1.247.3 only."
+        bytecode.stubHermesBoolGetter(
+            GOLD_OVERRIDE_METHOD,
+            value = true,
+            label = "androidGoldSubscriptionOverride"
+        )
+        if (forceFeatureGates == true) {
+            bytecode.stubHermesBoolGetter(
+                FEATURE_GATES_OVERRIDE_METHOD,
+                value = true,
+                label = "androidFeatureGatesOverride"
             )
         }
-        if (bytecode.indexOfSequence(GOLD_OVERRIDE_METHOD, offset + 1) != -1) {
-            throw PatchException("$PATCH_NAME: androidGoldSubscriptionOverride is not unique in $HERMES_BUNDLE_PATH.")
-        }
-
-        RETURN_TRUE_STUB.copyInto(bytecode, offset)
-        bytecode.fill(0x00, offset + RETURN_TRUE_STUB.size, offset + GOLD_OVERRIDE_METHOD.size)
-        bytecode.rehashHermes()
         bundle.writeBytes(bytecode)
     }
 }
