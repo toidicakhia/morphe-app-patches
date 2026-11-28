@@ -14,7 +14,7 @@ This bundle currently supports the following apps:
 |---:|-----|:------:|---------|---------|
 | 1 | [**1.1.1.1**](PATCHES.md#1111-comcloudflareonedotonedotonedotone) | 3 | `6.38.11` | [`com.cloudflare.onedotonedotonedotone`](https://play.google.com/store/apps/details?id=com.cloudflare.onedotonedotonedotone) |
 | 2 | [**EZVIZ**](PATCHES.md#ezviz-comezviz) | 3 | `7.6.1.0824` | [`com.ezviz`](https://play.google.com/store/apps/details?id=com.ezviz) |
-| 3 | [**HTTP Sniffer**](PATCHES.md#http-sniffer-comanetcapturemock) | 1 | `2.5.2-ad_mob`, `2.4.9-ad_mob` | [`com.anetcapture.mock`](https://play.google.com/store/apps/details?id=com.anetcapture.mock) |
+| 3 | [**HTTP Sniffer**](PATCHES.md#http-sniffer-comanetcapturemock) | 1 | `3.0.6-ad_mob` | [`com.anetcapture.mock`](https://play.google.com/store/apps/details?id=com.anetcapture.mock) |
 | 4 | [**Locket Widget**](PATCHES.md#locket-widget-comlocketlocket) | 3 | `1.247.3` | [`com.locket.Locket`](https://play.google.com/store/apps/details?id=com.locket.Locket) |
 | 5 | [**NetMonster**](PATCHES.md#netmonster-czmroczisnetmonster) | 1 | `4.0.5` | [`cz.mroczis.netmonster`](https://play.google.com/store/apps/details?id=cz.mroczis.netmonster) |
 | 6 | [**Proxyman**](PATCHES.md#proxyman-comproxymanproxymanandroid) | 1 | `1.33.0` | [`com.proxyman.proxymanandroid`](https://play.google.com/store/apps/details?id=com.proxyman.proxymanandroid) |
