@@ -25,7 +25,6 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.zip.Adler32
 import me.toidicakhia.patches.shared.Constants.LOCKET_COMPATIBILITY
-import org.w3c.dom.Element
 
 private const val PATCH_NAME = "Spoofer server"
 
@@ -34,8 +33,6 @@ private const val BUNDLE_PATH = "assets/index.android.bundle"
 private const val APP_DEX_PATH = "classes2.dex"
 private const val REMOTE_CONFIG_DEX_PATH = "classes3.dex"
 private const val REVENUECAT_DEX_PATH = "classes4.dex"
-private const val ANDROID_MANIFEST = "AndroidManifest.xml"
-private const val NETWORK_SECURITY_CONFIG = "res/xml/network_security_config.xml"
 
 /**
  * The app reads its API base URL from Firebase Remote Config (`functions_domains`),
@@ -285,29 +282,6 @@ private fun ResourcePatchContext.patchFunctionsDomainsKey() {
     )
     fixDexHeader(dexBytes)
     dex.writeBytes(dexBytes)
-}
-
-/** Locket has no network security config; create one and point the manifest at it. */
-private fun ResourcePatchContext.trustUserCertificates() {
-    document(ANDROID_MANIFEST).use { manifest ->
-        val application = manifest.getElementsByTagName("application").item(0) as? Element
-            ?: throw PatchException("$PATCH_NAME: $ANDROID_MANIFEST has no application element.")
-        application.setAttribute("android:networkSecurityConfig", "@xml/network_security_config")
-    }
-
-    get(NETWORK_SECURITY_CONFIG).writeText(
-        """
-        <?xml version="1.0" encoding="utf-8"?>
-        <network-security-config>
-            <base-config cleartextTrafficPermitted="false">
-                <trust-anchors>
-                    <certificates src="system" />
-                    <certificates src="user" overridePins="true" />
-                </trust-anchors>
-            </base-config>
-        </network-security-config>
-        """.trimIndent() + "\n"
-    )
 }
 
 private fun replaceUnique(bytes: ByteArray, old: ByteArray, new: ByteArray, label: String) {

@@ -62,6 +62,7 @@ Hiện có bốn bản vá cho Locket, nằm trong
 | `LocketSpooferServerPatch.kt` | Chuyển hướng host API / RevenueCat / Remote Config / CDN / groups WebSocket; đổi tên khoá RC `functions_domains`; tuỳ chọn tin user CA. |
 | `LocketAppCheckPatch.kt` | Stub ba wrapper khởi tạo App Check của React Native Firebase. |
 | `LocketRemoteConfigPatch.kt` | Ép giá trị một số flag RC phía client (recaptcha, history ads, Gold button, beta features). |
+| `LocketBypassSslPinningPatch.kt` | Tin user CA, stub OkHttp `CertificatePinner` và `HostnameVerifier` để debug qua proxy. |
 
 Tất cả đều khai báo `compatibleWith(LOCKET_COMPATIBILITY)`, hiện đã được chuyển
 sang **1.247.3 / versionCode 636** trong
@@ -173,10 +174,13 @@ Nguyên tắc: nếu một tính năng bắt buộc phải có máy chủ, bản
 ```
 patches/src/main/kotlin/me/toidicakhia/patches/locket/
 ├── LocketHermes.kt                  (dùng chung)
+├── LocketNetworkSecurity.kt         (dùng chung — user CA)
+├── LocketFingerprints.kt            (fingerprint smali)
 ├── LocketUnlockGoldPatch.kt         (mở rộng — P1)
 ├── LocketSpooferServerPatch.kt      (mở rộng — P2)
 ├── LocketAppCheckPatch.kt           (P3)
-└── LocketRemoteConfigPatch.kt       (P4)
+├── LocketRemoteConfigPatch.kt       (P4)
+└── LocketBypassSslPinningPatch.kt   (debug TLS)
 
 patches/src/main/kotlin/me/toidicakhia/patches/shared/Constants.kt   (P0)
 docs/locket-android-port-plan.md                                    (tài liệu này)
@@ -326,6 +330,22 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
     trong `classes3` đều được thay; `functions_domains` biến mất;
   - `network_security_config.xml` tồn tại và manifest có `android:networkSecurityConfig`;
   - tất cả 13 hàm đã stub có opcode đầu `0x78` (true) hoặc `0x79` (false) đúng kỳ vọng.
+
+### Patch debug TLS (đã thêm)
+
+- Locket 1.247.3 **không tự cấu hình pin chứng chỉ** (không có `CertificatePinner.add`,
+  không có custom `TrustManager`, không có `sha256/` pins trong dex/assets; OkHttp 5
+  chỉ dùng trust store mặc định). Vì vậy rào cản thực tế khi MITM là thiếu user CA.
+- Bản vá `Bypass SSL Pinning` (mặc định tắt):
+  - tạo `network_security_config.xml` tin user CA với `overridePins="true"` và gắn
+    vào manifest (helper dùng chung `LocketNetworkSecurity.kt`, cũng dùng cho tuỳ chọn
+    tương tự trong bản vá Spoofer);
+  - stub `Lokhttp3/CertificatePinner;b(String,Function0)V` → `return-void`;
+  - stub `Lokhttp3/internal/tls/OkHostnameVerifier;verify(String,SSLSession)Z` → `true`.
+- Đã apply riêng bản vá này vào XAPK thật: **Applied: Bypass SSL Pinning**, không lỗi
+  fingerprint. `--verify-with-sdk` báo các cảnh báo có sẵn của AppsFlyer/Sentry/Amazon
+  do class nằm ở split dex khác — không phải lỗi do bản vá. Kiểm tra dex vá thấy
+  cả hai method đã có stub đúng.
 
 ### Bước tiếp theo
 
