@@ -27,7 +27,7 @@ updated fingerprints before a patch can be applied.
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.8.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.8.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;22 patches total
+> **[v1.8.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.8.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;23 patches total
 <details open>
 <summary><img src=".github/assets/apps/vn.vtv.vtvgo.png" alt="" height="20"> VTVGo&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
@@ -46,6 +46,23 @@ updated fingerprints before a patch can be applied.
 | [Remove Video Ads](#remove-video-ads) | Removes VTVGo pre-roll, mid-roll, welcome TVC and other VAST/IMA ads by rejecting ad requests before playback starts. |  |
 | [Trust User Certificates](#trust-user-certificates) | Adds user-installed CA certificates to the network security config so native traffic can be inspected with a debugging proxy. Flutter's Dart HTTP stack keeps its own trust store. |  |
 | [Video quality control](#video-quality-control) | Adds an on-screen settings menu for the player's video quality. Auto follows the app's own selection; the other presets override the player's quality caps. |  |
+
+</details>
+
+<details open>
+<summary><img src=".github/assets/apps/com.locket.Locket.png" alt="" height="20"> Locket Widget&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
+<br>
+
+**🎯 Supported versions:**
+
+| 1.247.3 |
+| :---: |
+
+| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
+|----------|----------------|-----------|
+| [Bypass SSL Pinning](#bypass-ssl-pinning) | For TLS debugging: trusts user-installed CA certificates, skips OkHttp certificate pinning and accepts any hostname, so a local proxy can inspect HTTPS traffic. Not selected by default. |  |
+| [Spoof Firebase signing certificate](#spoof-firebase-signing-certificate) | Sends Locket's original signing-certificate SHA-1 to Firebase Installations, Remote Config, App Check and Auth. Required after repackaging: Morphe re-signs the APK, and Google otherwise rejects the requests with HTTP 403. | • Original Firebase SHA-1 |
+| [Unlock Locket Gold](#unlock-locket-gold) | Makes the app treat the signed-in account as a Locket Gold subscriber, enabling the Gold-only feature gates and replacing the paywall with subscription management. Client-side only: features validated by Locket's servers still need a real subscription. | • Force feature gates |
 
 </details>
 
@@ -112,22 +129,6 @@ updated fingerprints before a patch can be applied.
 |----------|----------------|-----------|
 | [Disable Analytics / Telemetry](#disable-analytics-telemetry) | Stops WeDJ's Mobylog tracking client from uploading playback, device-connection and startup app-check events. |  |
 | [Unlock Unlimited Playback](#unlock-unlimited-playback) | Makes WeDJ treat the "Unlock Unlimited Playback" in-app purchase as owned. The free-version limit that stops playback after loading a few tracks is removed and the purchase entry disappears from the track browser. Use WeDJ 1.1.1.3 on Android 9-12 and 1.1.4.5 on Android 13+. Client-side only: the Play Store transaction itself is not simulated. |  |
-
-</details>
-
-<details open>
-<summary><img src=".github/assets/apps/com.locket.Locket.png" alt="" height="20"> Locket Widget&nbsp;&nbsp;•&nbsp;&nbsp;2 patches</summary>
-<br>
-
-**🎯 Supported versions:**
-
-| 1.247.1 |
-| :---: |
-
-| 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
-|----------|----------------|-----------|
-| [Spoofer server](#spoofer-server) | Sends Locket's API traffic (feed, profile, AI frames, captions) to a self-hosted spoofer server instead of api.locketcamera.com. Enter the server address; the app keeps using the server's own HTTPS certificate, so no DNS profile or CA install is needed. Enable the second option to route RevenueCat and Firebase Remote Config through the same server as well. Not selected by default. | • Spoofer server<br>• Route RevenueCat and Remote Config |
-| [Unlock Locket Gold](#unlock-locket-gold) | Makes the app treat the signed-in account as a Locket Gold subscriber, enabling the Gold-only feature gates and replacing the paywall with subscription management. Client-side only: features validated by Locket's servers still need a real subscription. |  |
 
 </details>
 
