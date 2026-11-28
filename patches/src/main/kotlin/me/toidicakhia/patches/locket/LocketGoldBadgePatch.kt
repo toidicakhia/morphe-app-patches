@@ -6,34 +6,37 @@ import me.toidicakhia.patches.shared.Constants.LOCKET_COMPATIBILITY
 private const val PATCH_NAME = "Enable Locket Gold badge"
 
 /**
- * Hermes bytecode of doesUserHaveGoldBadge() in Locket 1.247.3 (version code 636).
+ * Hermes bytecode of the effect closure in useCustomization() (Locket 1.247.3,
+ * version code 636) that pushes the local "Locket Gold badge" state back to
+ * Locket's servers:
  *
- * The function is the single source of truth for the "Locket Gold badge" setting:
- * useCustomization() derives `goldBadgeEnabled` from it, renderAvatarBadge() uses
- * it to draw the badge, and the settings toggle writes the result back to the
- * server through changeProfileInfo(). Because the server only accepts the badge
- * for a real Gold subscriber, the toggle can never stay on in a patched app.
+ *   if (goldBadgeEnabled == null) return
+ *   if (doesUserHaveGoldBadge(currentUser?.badge) !== goldBadgeEnabled) {
+ *       updateGoldBadge({ oldValue, newValue, setGoldBadgeEnabled, updateCurrentUser })
+ *   }
  *
- * Compiled body:
+ * updateGoldBadge() calls changeProfileInfo({ badge: ... }) and then
+ * updateCurrentUser(). Without a real subscription Locket rejects the badge
+ * change, so the state is reset and the toggle cannot be kept on.
  *
- *   GetEnvironment r0
- *   LoadFromEnvironment r1, r0, LOCKET_GOLD_BADGE
- *   LoadParam r0, 1
- *   StrictEq r0, r1, r0
- *   Ret r0
+ * Stubbing this effect to a no-op leaves the React state as the single source
+ * of truth: onToggleGoldBadge() still flips the value with `prev => !prev`,
+ * and the toggle stays in the position the user chose for the session.
  *
- * Verified against the exact 1.247.3 bundle; other builds compile this function
+ * Verified against the exact 1.247.3 bundle; other builds compile this closure
  * to different bytes and are intentionally unsupported by the compatibility.
  */
-private val DOES_USER_HAVE_GOLD_BADGE =
-    "2900002e0100046c00010f0000015c00".hexToByteArray()
+private val GOLD_BADGE_SYNC_EFFECT =
+    "2904002e0104037600bc6001002901012e02010837030201aab62e05040077020e060502760290090637020502bb6453060300022e050403bc2b06052e03010e030240020678a5400205cba42e050404400205c4842e040401400204e6b153020300022e0101115c015c00".hexToByteArray()
 
 @Suppress("unused")
 val locketGoldBadgePatch = resourcePatch(
     name = PATCH_NAME,
-    description = "Turns on the 'Locket Gold badge' setting and draws the Gold badge on " +
-        "avatars, without needing Locket's servers to accept a badge change. " +
-        "Client-side only: the badge is not stored on Locket's servers.",
+    description = "Makes the 'Locket Gold badge' toggle work without a subscription: the " +
+        "state is kept locally instead of being written to Locket's servers, which " +
+        "reject badge changes from unsubscribed accounts. Turn the toggle on in " +
+        "Settings > Locket Gold to show the badge. Client-side only: the choice is " +
+        "not saved on Locket's servers and resets after a restart.",
     default = true
 ) {
     compatibleWith(LOCKET_COMPATIBILITY)
@@ -43,10 +46,9 @@ val locketGoldBadgePatch = resourcePatch(
         val bytecode = bundle.readBytes()
         bytecode.requireHermes96(HERMES_BUNDLE_PATH)
 
-        bytecode.stubHermesBoolGetter(
-            DOES_USER_HAVE_GOLD_BADGE,
-            value = true,
-            label = "doesUserHaveGoldBadge"
+        bytecode.stubHermesNoOp(
+            GOLD_BADGE_SYNC_EFFECT,
+            label = "Locket Gold badge state sync effect"
         )
         bundle.writeBytes(bytecode)
     }

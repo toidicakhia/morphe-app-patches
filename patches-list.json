@@ -302,7 +302,7 @@
     },
     {
       "name": "Enable Locket Gold badge",
-      "description": "Turns on the 'Locket Gold badge' setting and draws the Gold badge on avatars, without needing Locket's servers to accept a badge change. Client-side only: the badge is not stored on Locket's servers.",
+      "description": "Makes the 'Locket Gold badge' toggle work without a subscription: the state is kept locally instead of being written to Locket's servers, which reject badge changes from unsubscribed accounts. Turn the toggle on in Settings > Locket Gold to show the badge. Client-side only: the choice is not saved on Locket's servers and resets after a restart.",
       "default": true,
       "category": null,
       "compatiblePackages": [
