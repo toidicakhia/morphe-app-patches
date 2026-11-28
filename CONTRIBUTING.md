@@ -37,17 +37,17 @@ java -jar morphe-desktop.jar patch \
 
 ## Regenerating generated files
 
-`patches-list.json`, `patches-bundle.json`, the README patch list, and `CHANGELOG.md` are
-generated. Do not edit them by hand. To refresh the patch list and README table locally:
+`patches-list.json`, `patches-bundle.json`, `PATCHES.md`, and `CHANGELOG.md` are generated.
+Do not edit them by hand. To refresh the patch metadata and details locally:
 
 ```bash
 ./gradlew :patches:generatePatchesList
-python3 .github/scripts/generate_patches_readme.py \
-  toidicakhia/morphe-app-patches main patches-list.json README.md
+python3 .github/scripts/generate_patches_md.py \
+  toidicakhia/morphe-app-patches main patches-list.json PATCHES.md
 ```
 
-The script replaces everything between the `<!-- PATCHES_START EXPANDED -->` and
-`<!-- PATCHES_END -->` markers in `README.md`, so keep those markers intact.
+The script rewrites all of `PATCHES.md`, including the per-app anchors used by the
+app table in `README.md`. Keep those anchors stable when changing the generator.
 
 ## Project layout
 
@@ -55,9 +55,9 @@ The script replaces everything between the `<!-- PATCHES_START EXPANDED -->` and
 - `patches/src/main/kotlin/me/toidicakhia/patches/shared/` — compatibility declarations
   and shared patch helpers.
 - `extensions/extension/` — Java code injected into patched apps.
-- `.github/scripts/` — helper script that regenerates the README patch list.
-- `patches-list.json`, `patches-bundle.json`, `CHANGELOG.md` — generated metadata and
-  release history. Do not edit them by hand.
+- `.github/scripts/` — helper script that regenerates `PATCHES.md`.
+- `patches-list.json`, `patches-bundle.json`, `PATCHES.md`, `CHANGELOG.md` — generated
+  metadata, patch details, and release history. Do not edit them by hand.
 
 ## Development workflow
 
