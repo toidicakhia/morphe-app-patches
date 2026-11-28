@@ -301,6 +301,40 @@
       "options": []
     },
     {
+      "name": "Keep Gold badge toggle state local",
+      "description": "Makes the 'Locket Gold badge' toggle work without a subscription. The last on/off position is saved locally and restored after a restart, instead of being written to Locket's servers, which reject badge changes from unsubscribed accounts. Client-side only: the badge is not stored on Locket's servers.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.locket.Locket",
+          "name": "Locket Widget",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#FFB201",
+          "signatures": [
+            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.247.3",
+              "versionCodes": {
+                "ARM64_V8A": 636,
+                "ARMEABI_V7A": 636,
+                "X86_64": 636,
+                "X86": 636
+              },
+              "isExperimental": false,
+              "minSdk": 27,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": []
+    },
+    {
       "name": "Remove Ad ID Permissions",
       "description": "Removes the advertising ID, Privacy Sandbox ad-services and Play install-referrer permissions. Device identification used for device management is left untouched.",
       "default": true,

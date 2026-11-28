@@ -7,6 +7,9 @@ internal const val HERMES_BUNDLE_PATH = "assets/index.android.bundle"
 internal const val HERMES_VERSION = 96
 internal const val HERMES_SHA1_SIZE = 20
 
+/** LoadConstUndefined r0; Ret r0 — a no-op callback for useEffect. */
+private val NOOP_STUB = byteArrayOf(0x76, 0x00, 0x5C, 0x00)
+
 private val HERMES_MAGIC = byteArrayOf(
     0xC6.toByte(), 0x1F, 0xBC.toByte(), 0x03, 0xC1.toByte(), 0x03, 0x19, 0x1F
 )
@@ -52,7 +55,17 @@ internal fun ByteArray.stubHermesBoolGetter(
     pattern: ByteArray,
     value: Boolean,
     label: String
-) {
+) = stubHermesFunction(
+    pattern,
+    if (value) byteArrayOf(0x78, 0x00, 0x5C, 0x00) else byteArrayOf(0x79, 0x00, 0x5C, 0x00),
+    label
+)
+
+/** Replaces a unique Hermes function with `LoadConstUndefined; Ret` and rehashes the footer. */
+internal fun ByteArray.stubHermesNoOp(pattern: ByteArray, label: String) =
+    stubHermesFunction(pattern, NOOP_STUB, label)
+
+private fun ByteArray.stubHermesFunction(pattern: ByteArray, stub: ByteArray, label: String) {
     val offset = indexOfSequence(pattern)
     if (offset == -1) {
         throw PatchException("Could not locate $label in $HERMES_BUNDLE_PATH.")
@@ -61,11 +74,6 @@ internal fun ByteArray.stubHermesBoolGetter(
         throw PatchException("$label is not unique in $HERMES_BUNDLE_PATH.")
     }
 
-    val stub = if (value) {
-        byteArrayOf(0x78, 0x00, 0x5C, 0x00)
-    } else {
-        byteArrayOf(0x79, 0x00, 0x5C, 0x00)
-    }
     stub.copyInto(this, offset)
     fill(0x00, offset + stub.size, offset + pattern.size)
     rehashHermes()
