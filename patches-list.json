@@ -269,40 +269,6 @@
       "options": []
     },
     {
-      "name": "Disable App Check",
-      "description": "Stubs the React Native Firebase App Check activation wrappers so the app no longer requests an attestation token. Best effort: server-side enforcement of X-Firebase-AppCheck on writes and media uploads is unaffected.",
-      "default": false,
-      "category": null,
-      "compatiblePackages": [
-        {
-          "packageName": "com.locket.Locket",
-          "name": "Locket Widget",
-          "description": null,
-          "apkFileType": "XAPK",
-          "appIconColor": "#FFB201",
-          "signatures": [
-            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
-          ],
-          "formFactor": "MOBILE",
-          "targets": [
-            {
-              "version": "1.247.3",
-              "versionCodes": {
-                "ARM64_V8A": 636,
-                "ARMEABI_V7A": 636,
-                "X86_64": 636,
-                "X86": 636
-              },
-              "isExperimental": false,
-              "minSdk": 27,
-              "description": null
-            }
-          ]
-        }
-      ],
-      "options": []
-    },
-    {
       "name": "Disable SSL Pinning",
       "description": "Bypasses OkHttp certificate pinning on Cloudflare API calls to allow TLS traffic inspection.",
       "default": false,

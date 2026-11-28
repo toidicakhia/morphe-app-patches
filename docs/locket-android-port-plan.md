@@ -60,7 +60,6 @@ Hiện có bốn bản vá cho Locket, nằm trong
 |---|---|
 | `LocketUnlockGoldPatch.kt` | Stub `androidGoldSubscriptionOverride()` (và tuỳ chọn `androidFeatureGatesOverride()`) thành `LoadConstTrue; Ret`. |
 | `LocketSpooferServerPatch.kt` | Chuyển hướng host API / RevenueCat / Remote Config / CDN / groups WebSocket; đổi tên khoá RC `functions_domains`; tuỳ chọn tin user CA. |
-| `LocketAppCheckPatch.kt` | Stub ba wrapper khởi tạo App Check của React Native Firebase. |
 | `LocketRemoteConfigPatch.kt` | Ép giá trị một số flag RC phía client (recaptcha, history ads, Gold button, beta features). |
 | `LocketBypassSslPinningPatch.kt` | Tin user CA, stub OkHttp `CertificatePinner` và `HostnameVerifier` để debug qua proxy. |
 | `LocketSpoofFirebaseCertPatch.kt` | Trả về SHA-1 chữ ký gốc cho Firebase (sửa lỗi 403 sau khi đóng gói lại). |
@@ -135,13 +134,13 @@ Nguyên tắc: nếu một tính năng bắt buộc phải có máy chủ, bản
   và thêm `android:networkSecurityConfig` vào `<application>` khi bật tuỳ chọn tin user CA.
 - Relay spoofer hiện tại là HTTP-only; route WebSocket chỉ nên bật khi server hỗ trợ wss.
 
-### P3 — Disable App Check (xong)
+### P3 — App Check (đã gỡ bản vá)
 
-- Không tồn tại flag RC `android_appcheck_enabled`. Bản vá mới
-  `LocketAppCheckPatch.kt` stub ba wrapper khởi tạo: `initAppCheck`,
-  `initAppCheckRecaptcha` và `initializeAppCheck`.
-- Các hàm lấy token được giữ nguyên vì phải trả về chuỗi, không phải boolean.
-- Đây là biện pháp best effort: backend vẫn có thể tự enforce `X-Firebase-AppCheck`.
+- Từng có bản vá `Disable App Check` stub ba wrapper khởi tạo (`initAppCheck`,
+  `initAppCheckRecaptcha`, `initializeAppCheck`), nhưng không giải quyết được
+  enforcement phía server và có rủi ro làm hỏng luồng lấy token.
+- Bản vá đó **đã bị xoá** khỏi repo. Phần App Check hiện chỉ được xử lý gián tiếp
+  qua `Spoof Firebase signing certificate` (sửa header `X-Android-Cert` sau khi ký lại).
 
 ### P4 — Remote Config overrides (xong)
 
@@ -179,7 +178,6 @@ patches/src/main/kotlin/me/toidicakhia/patches/locket/
 ├── LocketFingerprints.kt            (fingerprint smali)
 ├── LocketUnlockGoldPatch.kt         (mở rộng — P1)
 ├── LocketSpooferServerPatch.kt      (mở rộng — P2)
-├── LocketAppCheckPatch.kt           (P3)
 ├── LocketRemoteConfigPatch.kt       (P4)
 ├── LocketBypassSslPinningPatch.kt   (debug TLS)
 └── LocketSpoofFirebaseCertPatch.kt  (sửa 403 Firebase)
@@ -293,8 +291,7 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
 - **P2**: `Spoofer server` có thêm route riêng cho RevenueCat, Remote Config, CDN,
   groups WebSocket, đổi luôn host API trong `classes2.dex`, và tạo
   `network_security_config.xml` khi bật tin user CA.
-- **P3**: bản vá mới `Disable App Check` stub ba wrapper khởi tạo App Check;
-  không đụng vào hàm lấy token.
+- **P3**: đã thử và **gỡ bỏ** bản vá `Disable App Check`; xem phần P3 ở mục 5.
 - **P4**: bản vá mới `Remote Config overrides` ép 6 flag recaptcha + history ads
   thành false, Gold button + beta features thành true.
 - **P5**: chỉ `getMomentOverlayData` tồn tại trong 1.247.3; đã được chuyển hướng
@@ -307,7 +304,6 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
   `stubHermesBoolGetter()` với opcode `0x78` (true) / `0x79` (false).
 - `patches/.../locket/LocketUnlockGoldPatch.kt`: pattern 1.247.3 + tuỳ chọn feature gates.
 - `patches/.../locket/LocketSpooferServerPatch.kt`: routing theo từng host.
-- `patches/.../locket/LocketAppCheckPatch.kt` *(mới)*.
 - `patches/.../locket/LocketRemoteConfigPatch.kt` *(mới)*.
 
 ### Build và apply (đã hoàn thành)
@@ -318,20 +314,20 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
   command-line tools + `platforms;android-36` + `build-tools;36.0.0` + `platform-tools`.
 - `./gradlew :patches:compileKotlin` và `./gradlew :patches:buildAndroid` đều
   **BUILD SUCCESSFUL**. Artifact: `patches/build/libs/patches-1.8.0.mpp` (~1,4 MB).
-- Đã sinh lại `patches-list.json` và bảng README (giờ có 4 bản vá Locket, chỉ
+- Đã sinh lại `patches-list.json` và bảng README (hiện có **5 bản vá Locket**, chỉ
   hỗ trợ **1.247.3**); script README báo lỗi khi in ✅ ra console cp1252 nhưng file
   đã được ghi đúng trước đó.
 
 ### Kiểm chứng apply
 
-- Tải `morphe-desktop-2.4.0-all.jar` và apply **cả 4 bản vá với mọi tuỳ chọn bật**
-  vào XAPK 1.247.3 thật, với `--validate --verify-with-sdk` → **thành công**.
+- Tải `morphe-desktop-2.4.0-all.jar` và apply lần lượt từng bản vá (có bật mọi tuỳ
+  chọn) vào XAPK 1.247.3 thật, với `--validate` → **thành công**.
 - Giải nén APK đã vá và kiểm tra:
   - `app.config`: `baseUrl`, `groupsWebsocketUrl`, `defaultBasePath` đều trỏ tới spoofer;
   - dex: API host trong `classes2`, RevenueCat trong `classes4`, Remote Config
     trong `classes3` đều được thay; `functions_domains` biến mất;
   - `network_security_config.xml` tồn tại và manifest có `android:networkSecurityConfig`;
-  - tất cả 13 hàm đã stub có opcode đầu `0x78` (true) hoặc `0x79` (false) đúng kỳ vọng.
+  - các hàm Hermes đã stub có opcode đầu `0x78` (true) hoặc `0x79` (false) đúng kỳ vọng.
 
 ### Patch debug TLS (đã thêm)
 
