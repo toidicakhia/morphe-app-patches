@@ -1,30 +1,32 @@
-# 🧩 toidicakhia's patches
+# toidicakhia's patches
 
-Patches for Android apps, built for [Morphe](https://morphe.software).
+A collection of patches for Android apps, built for [Morphe](https://morphe.software).
 
 <a href="https://morphe.software/add-source?github=toidicakhia/morphe-app-patches">
   <img src=".github/assets/add-to-morphe.svg" alt="Add to Morphe" height="48">
 </a>
 
-## ✨ What's inside
+## What's inside
 
-This bundle currently supports:
+This bundle currently supports the following apps:
 
-| App | Version | Patches |
-|-----|---------|---------|
-| EZVIZ | 7.6.1.0824 | Remove ads, bypass SSL pinning, bypass signature check |
-| 1.1.1.1 | 6.38.11 | Disable analytics, disable SSL pinning, spoof WARP+ unlimited UI |
-| Universal Copy | 7.2.0 | Unlock Plus, remove ads/upgrade prompts and the Internet permission |
-| NetMonster | 4.0.5 | Unlock premium |
-| HTTP Sniffer | 2.5.2-ad_mob, 2.4.9-ad_mob | Unlock VIP |
-| Proxyman | 1.33.0 | Unlock Pro |
-| VTVGo | 12.11.19 | Remove video/product ads, disable analytics, remove Ad ID permissions |
-| TeraBox | 4.29.0 | Bypass SSL pinning |
+| # | App | Patches | Version | Package |
+|---:|-----|:------:|---------|---------|
+| 1 | [**1.1.1.1**](https://play.google.com/store/apps/details?id=com.cloudflare.onedotonedotonedotone) | 3 | `6.38.11` | `com.cloudflare.onedotonedotonedotone` |
+| 2 | [**EZVIZ**](https://play.google.com/store/apps/details?id=com.ezviz) | 3 | `7.6.1.0824` | `com.ezviz` |
+| 3 | [**HTTP Sniffer**](https://play.google.com/store/apps/details?id=com.anetcapture.mock) | 1 | `2.5.2-ad_mob`, `2.4.9-ad_mob` | `com.anetcapture.mock` |
+| 4 | [**Locket Widget**](https://play.google.com/store/apps/details?id=com.locket.Locket) | 3 | `1.247.3` | `com.locket.Locket` |
+| 5 | [**NetMonster**](https://play.google.com/store/apps/details?id=cz.mroczis.netmonster) | 1 | `4.0.5` | `cz.mroczis.netmonster` |
+| 6 | [**Proxyman**](https://play.google.com/store/apps/details?id=com.proxyman.proxymanandroid) | 1 | `1.33.0` | `com.proxyman.proxymanandroid` |
+| 7 | [**TeraBox**](https://play.google.com/store/apps/details?id=com.dubox.drive) | 1 | `4.29.0` | `com.dubox.drive` |
+| 8 | [**Universal Copy**](https://play.google.com/store/apps/details?id=com.camel.corp.universalcopy) | 1 | `7.2.0` | `com.camel.corp.universalcopy` |
+| 9 | [**VTVGo**](https://play.google.com/store/apps/details?id=vn.vtv.vtvgo) | 7 | `12.11.19` | `vn.vtv.vtvgo` |
+| 10 | [**WeDJ**](https://play.google.com/store/apps/details?id=com.pioneerdj.WeDJ) | 2 | `1.1.4.5`, `1.1.1.3` | `com.pioneerdj.WeDJ` |
 
 Only the exact versions listed above are supported. Newer app releases usually need
 updated fingerprints before a patch can be applied.
 
-## 🩹 Patches list
+## Patches list
 
 <!-- PATCHES_START EXPANDED -->
 > **[v1.9.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.9.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;23 patches total
@@ -196,88 +198,42 @@ updated fingerprints before a patch can be applied.
 
 &nbsp;
 
-## 📲 How to use
+## How to use
 
 1. Install [Morphe Manager](https://github.com/MorpheApp/morphe-manager) or
    [Morphe Desktop](https://github.com/MorpheApp/morphe-desktop).
-2. Add this source using the link at the top of this page, or add the generated
+2. Add this source with the link at the top of this page, or add the generated
    `patches-bundle.json` URL manually.
-3. Select the app and the patches you want, then apply them.
+3. Select an app and the patches you want, then apply them.
 4. Install the patched APK. Uninstall the original app first if the signatures conflict.
 
-> **Note:** patched APKs are signed with a different key. Back up app data before
-> replacing the original app. Some patches intentionally remove permissions or
-> features, such as the Internet permission in Universal Copy.
+> **Note:** patched APKs are signed with a different key. Back up your app data before
+> replacing the original app. Some patches intentionally remove permissions or features,
+> such as the Internet permission in Universal Copy.
 
-## 🛠️ Build from source
+## Build from source
 
-### Prerequisites
-
-- JDK 21.
-- Android SDK 36 (`ANDROID_HOME` or `sdk.dir` in `local.properties`).
-- GitHub credentials with `read:packages` for the Morphe GitHub Packages registry.
-  Set `GITHUB_ACTOR` / `GITHUB_TOKEN`, or add `gpr.user` / `gpr.key` to
-  `~/.gradle/gradle.properties`.
+You need JDK 21, Android SDK 36 (`ANDROID_HOME` or `sdk.dir` in `local.properties`), and
+GitHub credentials with `read:packages` for the Morphe GitHub Packages registry.
 
 ```bash
 export GITHUB_ACTOR=<your GitHub user>
 export GITHUB_TOKEN=<token with read:packages>
 export SHARED_MAPS_API_KEY=<optional Google Maps key for NetMonster>
-```
 
-### Build the patch bundle
-
-```bash
 ./gradlew :patches:buildAndroid
 ```
 
-The bundle is written to `patches/build/libs/patches-*.mpp`. Apply it with
-Morphe Desktop, or with the Morphe CLI:
+The bundle is written to `patches/build/libs/patches-*.mpp` and can be applied with
+Morphe Desktop or the Morphe CLI. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full
+setup, build, and development guide.
 
-```bash
-java -jar morphe-desktop.jar patch \
-  -p patches/build/libs/patches-<version>.mpp \
-  -e "Patch name" \
-  app.apk
-```
+## Contributing
 
-To refresh the generated patch list and README table locally:
+Contributions are welcome — new patches, updated fingerprints, bug fixes, and docs.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, the development workflow,
+and tips for working with patches.
 
-```bash
-./gradlew :patches:generatePatchesList
-python3 .github/scripts/generate_patches_readme.py \
-  toidicakhia/morphe-app-patches main patches-list.json README.md
-```
-
-## 📁 Project layout
-
-- `patches/src/main/kotlin/me/toidicakhia/patches/` — patch code, grouped by app.
-- `patches/src/main/kotlin/me/toidicakhia/patches/shared/` — compatibility declarations
-  and shared patch helpers.
-- `extensions/extension/` — Java code injected into patched apps.
-- `.github/scripts/` — helper script that regenerates the README patch list.
-- `patches-list.json`, `patches-bundle.json`, `CHANGELOG.md` — generated metadata and
-  release history. Do not edit them by hand.
-
-## 🧑‍💻 Development workflow
-
-- Make changes on the `main` branch.
-- Use [semantic commit](https://kapeli.com/cheat_sheets/Semantic_Commits.docset/Contents/Resources/Documents/index)
-  messages:
-  - `feat: add a new feature`
-  - `fix: fix a problem`
-  - `chore: a change that should not appear in the user-facing changelog`
-- Build the bundle locally with `./gradlew :patches:buildAndroid`. No release
-  automation is configured.
-- Do not edit generated files by hand.
-
-## 🤓 Tips
-
-- See the [patcher documentation](https://github.com/MorpheApp/morphe-patcher/blob/main/docs/1_patcher_intro.md)
-  for examples of patches and fingerprints.
-- When adding support for a new app version, verify every fingerprint against the exact
-  APK and update the compatibility target in `shared/Constants.kt`.
-
-## 📜 License
+## License
 
 toidicakhia's patches are licensed under the [GNU General Public License v3.0](LICENSE).
