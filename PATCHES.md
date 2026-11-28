@@ -169,8 +169,8 @@ Every patch bundled in this source, grouped by app. See the [README](README.md) 
 
 **🎯 Supported versions:**
 
-| 2.5.2-ad_mob | 2.4.9-ad_mob |
-| :---: | :---: |
+| 3.0.6-ad_mob |
+| :---: |
 
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
