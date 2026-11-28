@@ -27,7 +27,7 @@ updated fingerprints before a patch can be applied.
 ## 🩹 Patches list
 
 <!-- PATCHES_START EXPANDED -->
-> **[v1.9.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.9.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;23 patches total
+> **[v1.9.0](https://github.com/toidicakhia/morphe-app-patches/releases/tag/v1.9.0)**&nbsp;&nbsp;•&nbsp;&nbsp;`main`&nbsp;&nbsp;•&nbsp;&nbsp;24 patches total
 <details open>
 <summary><img src=".github/assets/apps/vn.vtv.vtvgo.png" alt="" height="20"> VTVGo&nbsp;&nbsp;•&nbsp;&nbsp;7 patches</summary>
 <br>
@@ -50,7 +50,7 @@ updated fingerprints before a patch can be applied.
 </details>
 
 <details open>
-<summary><img src=".github/assets/apps/com.locket.Locket.png" alt="" height="20"> Locket Widget&nbsp;&nbsp;•&nbsp;&nbsp;3 patches</summary>
+<summary><img src=".github/assets/apps/com.locket.Locket.png" alt="" height="20"> Locket Widget&nbsp;&nbsp;•&nbsp;&nbsp;4 patches</summary>
 <br>
 
 **🎯 Supported versions:**
@@ -61,6 +61,7 @@ updated fingerprints before a patch can be applied.
 | 💊&nbsp;Patch | 📜&nbsp;Description | ⚙️&nbsp;Options |
 |----------|----------------|-----------|
 | [Bypass SSL Pinning](#bypass-ssl-pinning) | For TLS debugging: trusts user-installed CA certificates, skips OkHttp certificate pinning and accepts any hostname, so a local proxy can inspect HTTPS traffic. Not selected by default. |  |
+| [Enable Locket Gold badge](#enable-locket-gold-badge) | Turns on the 'Locket Gold badge' setting and draws the Gold badge on avatars, without needing Locket's servers to accept a badge change. Client-side only: the badge is not stored on Locket's servers. |  |
 | [Spoof Firebase signing certificate](#spoof-firebase-signing-certificate) | Sends Locket's original signing-certificate SHA-1 to Firebase Installations, Remote Config, App Check and Auth. Required after repackaging: Morphe re-signs the APK, and Google otherwise rejects the requests with HTTP 403. | • Original Firebase SHA-1 |
 | [Unlock Locket Gold](#unlock-locket-gold) | Makes the app treat the signed-in account as a Locket Gold subscriber, enabling the Gold-only feature gates and replacing the paywall with subscription management. Client-side only: features validated by Locket's servers still need a real subscription. | • Force feature gates |
 
