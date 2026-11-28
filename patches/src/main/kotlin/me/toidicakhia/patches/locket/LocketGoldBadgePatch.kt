@@ -30,7 +30,7 @@ private const val SYNC_EFFECT_PATTERN =
 
 /** Same effect, writing the toggle to `userPreferencesMMKV` via `setBoolean`. */
 private const val PATCHED_SYNC_EFFECT =
-    "300037010001aa5e6f02a105000053030100023704030235423705040325d37306253f2907002e08070354090500060876095c09"
+    "300037010000aa5e6f02a105000053030100023704030035423705040025d37306253f2907002e08070354090500060876095c09"
 
 /** Relocated `doesUserHaveGoldBadge()`: reads `gold_badge_enabled` from MMKV. */
 private const val PATCHED_GETTER =
