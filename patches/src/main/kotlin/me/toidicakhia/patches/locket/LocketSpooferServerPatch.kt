@@ -33,12 +33,6 @@ private const val APP_DEX_PATH = "classes2.dex"
 private const val REMOTE_CONFIG_DEX_PATH = "classes3.dex"
 private const val REVENUECAT_DEX_PATH = "classes4.dex"
 
-private const val HERMES_VERSION = 96
-private const val HERMES_SHA1_SIZE = 20
-private val HERMES_MAGIC = byteArrayOf(
-    0xC6.toByte(), 0x1F, 0xBC.toByte(), 0x03, 0xC1.toByte(), 0x03, 0x19, 0x1F
-)
-
 /**
  * The app reads its API base URL from Firebase Remote Config (`functions_domains`),
  * and Locket's production config always answers with the real API host, which
@@ -175,14 +169,14 @@ private fun app.morphe.patcher.patch.ResourcePatchContext.patchAppConfig(spoofer
 private fun app.morphe.patcher.patch.ResourcePatchContext.patchFunctionsDomainsKey() {
     val bundle = get(BUNDLE_PATH)
     val bundleBytes = bundle.readBytes()
-    requireHermes(bundleBytes)
+    bundleBytes.requireHermes96(BUNDLE_PATH)
     replaceUnique(
         bytes = bundleBytes,
         old = FUNCTIONS_DOMAINS.toByteArray(),
         new = LOCAL_FUNCTIONS_DOMAINS.toByteArray(),
         label = "$BUNDLE_PATH (functions_domains)"
     )
-    rehashHermes(bundleBytes)
+    bundleBytes.rehashHermes()
     bundle.writeBytes(bundleBytes)
 
     val dex = get(APP_DEX_PATH)
@@ -209,30 +203,6 @@ private fun replaceUnique(bytes: ByteArray, old: ByteArray, new: ByteArray, labe
     }
 
     new.copyInto(bytes, offset)
-}
-
-private fun requireHermes(bytes: ByteArray) {
-    val hasMagic = bytes.size > HERMES_SHA1_SIZE &&
-        bytes.copyOfRange(0, HERMES_MAGIC.size).contentEquals(HERMES_MAGIC)
-    if (!hasMagic) {
-        throw PatchException("$PATCH_NAME: $BUNDLE_PATH is not a Hermes bytecode bundle.")
-    }
-
-    val version = (bytes[8].toInt() and 0xFF) or
-        ((bytes[9].toInt() and 0xFF) shl 8) or
-        ((bytes[10].toInt() and 0xFF) shl 16) or
-        ((bytes[11].toInt() and 0xFF) shl 24)
-    if (version != HERMES_VERSION) {
-        throw PatchException("$PATCH_NAME: unsupported Hermes bytecode version $version.")
-    }
-}
-
-/** Hermes stores a SHA-1 of the whole file in its footer. */
-private fun rehashHermes(bytes: ByteArray) {
-    val footerOffset = bytes.size - HERMES_SHA1_SIZE
-    val digest = MessageDigest.getInstance("SHA-1")
-    digest.update(bytes, 0, footerOffset)
-    digest.digest().copyInto(bytes, footerOffset)
 }
 
 /** A dex keeps an Adler-32 checksum at 8 and a SHA-1 signature at 12, both over the header tail. */
@@ -329,12 +299,4 @@ private fun dexVersion(bytes: ByteArray): Int {
     }
     return bytes.copyOfRange(4, 7).decodeToString().toIntOrNull()
         ?: throw PatchException("$PATCH_NAME: unsupported dex version.")
-}
-
-private fun ByteArray.indexOfSequence(sequence: ByteArray, startIndex: Int = 0): Int {
-    if (sequence.isEmpty() || sequence.size > size) return -1
-    for (index in startIndex..size - sequence.size) {
-        if (sequence.indices.all { this[index + it] == sequence[it] }) return index
-    }
-    return -1
 }
