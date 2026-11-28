@@ -63,6 +63,7 @@ Hiện có bốn bản vá cho Locket, nằm trong
 | `LocketAppCheckPatch.kt` | Stub ba wrapper khởi tạo App Check của React Native Firebase. |
 | `LocketRemoteConfigPatch.kt` | Ép giá trị một số flag RC phía client (recaptcha, history ads, Gold button, beta features). |
 | `LocketBypassSslPinningPatch.kt` | Tin user CA, stub OkHttp `CertificatePinner` và `HostnameVerifier` để debug qua proxy. |
+| `LocketSpoofFirebaseCertPatch.kt` | Trả về SHA-1 chữ ký gốc cho Firebase (sửa lỗi 403 sau khi đóng gói lại). |
 
 Tất cả đều khai báo `compatibleWith(LOCKET_COMPATIBILITY)`, hiện đã được chuyển
 sang **1.247.3 / versionCode 636** trong
@@ -180,7 +181,8 @@ patches/src/main/kotlin/me/toidicakhia/patches/locket/
 ├── LocketSpooferServerPatch.kt      (mở rộng — P2)
 ├── LocketAppCheckPatch.kt           (P3)
 ├── LocketRemoteConfigPatch.kt       (P4)
-└── LocketBypassSslPinningPatch.kt   (debug TLS)
+├── LocketBypassSslPinningPatch.kt   (debug TLS)
+└── LocketSpoofFirebaseCertPatch.kt  (sửa 403 Firebase)
 
 patches/src/main/kotlin/me/toidicakhia/patches/shared/Constants.kt   (P0)
 docs/locket-android-port-plan.md                                    (tài liệu này)
@@ -347,7 +349,24 @@ D:\LocketWidget\rebuild\caddy-spoofer-domain.caddy
   do class nằm ở split dex khác — không phải lỗi do bản vá. Kiểm tra dex vá thấy
   cả hai method đã có stub đúng.
 
+### Sửa lỗi 403 Firebase (đã thêm)
+
+- Khi debug qua HTTP Toolkit, request
+  `POST firebaseinstallations.googleapis.com/v1/projects/locket-4252a/installations`
+  trả **403** vì APK đã được Morphe ký lại: header `X-Android-Cert` mang SHA-1 mới
+  (`16A8FFE6…`) thay vì chữ ký gốc (`187A27D3…`) đã đăng ký với Firebase.
+- Bản vá `Spoof Firebase signing certificate` (mặc định bật, có tuỳ chọn
+  `originalCertSha1`) thay 5 method tính hash chứng chỉ trong `classes3.dex` bằng
+  hằng `187A27D3D7364A044307F56E66230F973DCCD5B7`:
+  `LKd/c;.g()` (Firebase Installations), `...remoteconfig.e.l()`,
+  `...ConfigFetchHttpClient.i()`, `LKc/p;.d()` (App Check) và
+  `...firebase-auth-api.zzaen.zza()`.
+- Đã apply riêng bản vá vào XAPK thật: **Applied: Spoof Firebase signing certificate**;
+  dexdump xác nhận cả 5 method đều bắt đầu bằng
+  `const-string v0, "187A27D3..." ; return-object v0`.
+
 ### Bước tiếp theo
 
 - Smoke-test trên thiết bị thật: UI Gold, flag RC, log request tới spoofer, đăng ảnh.
+- Kiểm tra lại request Firebase Installations trên HTTP Toolkit sau khi cài APK vá.
 - Quyết định có cần spoofer chạy ngay trên thiết bị hay không.

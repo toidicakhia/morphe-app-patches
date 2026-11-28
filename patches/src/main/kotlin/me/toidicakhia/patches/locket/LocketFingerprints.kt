@@ -26,3 +26,22 @@ val LocketOkHostnameVerifierFingerprint = Fingerprint(
     returnType = "Z",
     accessFlags = listOf(AccessFlags.PUBLIC)
 )
+
+/** Methods that compute the X-Android-Cert header from the APK signing certificate. */
+private val certProducers = listOf(
+    "LKd/c;" to "g",                                                       // Firebase Installations
+    "Lcom/google/firebase/remoteconfig/internal/e;" to "l",                // Remote Config
+    "Lcom/google/firebase/remoteconfig/internal/ConfigFetchHttpClient;" to "i",
+    "LKc/p;" to "d",                                                       // App Check
+    "Lcom/google/android/gms/internal/firebase-auth-api/zzaen;" to "zza"  // Firebase Auth
+)
+
+val locketCertProducerFingerprints = certProducers.map { (owner, methodName) ->
+    Fingerprint(
+        definingClass = owner,
+        name = methodName,
+        parameters = emptyList(),
+        returnType = "Ljava/lang/String;",
+        accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL)
+    )
+}

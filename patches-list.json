@@ -540,6 +540,50 @@
       "options": []
     },
     {
+      "name": "Spoof Firebase signing certificate",
+      "description": "Sends Locket's original signing-certificate SHA-1 to Firebase Installations, Remote Config, App Check and Auth. Required after repackaging: Morphe re-signs the APK, and Google otherwise rejects the requests with HTTP 403.",
+      "default": true,
+      "category": null,
+      "compatiblePackages": [
+        {
+          "packageName": "com.locket.Locket",
+          "name": "Locket Widget",
+          "description": null,
+          "apkFileType": "XAPK",
+          "appIconColor": "#FFB201",
+          "signatures": [
+            "f7dd2c755cbbdf342b216c453e76e2ffcb34d688e5f91499bec0341648cbcb16"
+          ],
+          "formFactor": "MOBILE",
+          "targets": [
+            {
+              "version": "1.247.3",
+              "versionCodes": {
+                "ARM64_V8A": 636,
+                "ARMEABI_V7A": 636,
+                "X86_64": 636,
+                "X86": 636
+              },
+              "isExperimental": false,
+              "minSdk": 27,
+              "description": null
+            }
+          ]
+        }
+      ],
+      "options": [
+        {
+          "key": "originalCertSha1",
+          "title": "Original Firebase SHA-1",
+          "description": "SHA-1 of Locket's original signing certificate, sent as X-Android-Cert.",
+          "required": true,
+          "type": "kotlin.String",
+          "default": "187A27D3D7364A044307F56E66230F973DCCD5B7",
+          "values": null
+        }
+      ]
+    },
+    {
       "name": "Spoof WARP+ Unlimited UI",
       "description": "Forces WarpPlusState to UNLIMITED on every AccountData instance by intercepting the primary constructor before the account type field is written.",
       "default": true,
