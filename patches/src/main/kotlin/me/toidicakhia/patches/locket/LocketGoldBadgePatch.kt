@@ -22,7 +22,7 @@ private const val ORIGINAL_GETTER_HEADER =
 
 /** Header redirected to the relocated getter: 44 bytes, 10 registers, 4 cache slots. */
 private const val PATCHED_GETTER_HEADER =
-    "b8e9a1042c00555bcc9aa11400040405"
+    "b8e9a1042d00555bcc9aa11400040405"
 
 /** The server-sync effect closure in `useCustomization()`. */
 private const val SYNC_EFFECT_PATTERN =
@@ -34,7 +34,7 @@ private const val PATCHED_SYNC_EFFECT =
 
 /** Relocated `doesUserHaveGoldBadge()`: reads `gold_badge_enabled` from MMKV. */
 private const val PATCHED_GETTER =
-    "300037010001aa5e6f02a1050000530301000237040302354237050403c56d7306253f790753080500065c08"
+    "300037010001aa5e6f02a1050000530301000237040302354237050403c56d7306253f79075408050006075c08"
 
 /**
  * Keeps the "Locket Gold badge" toggle in Locket's own MMKV preferences without
