@@ -450,6 +450,18 @@
           "formFactor": "MOBILE",
           "targets": [
             {
+              "version": "1.247.3",
+              "versionCodes": {
+                "ARM64_V8A": 636,
+                "ARMEABI_V7A": 636,
+                "X86_64": 636,
+                "X86": 636
+              },
+              "isExperimental": false,
+              "minSdk": 27,
+              "description": null
+            },
+            {
               "version": "1.247.1",
               "versionCodes": {
                 "ARM64_V8A": 632,
@@ -536,6 +548,18 @@
           ],
           "formFactor": "MOBILE",
           "targets": [
+            {
+              "version": "1.247.3",
+              "versionCodes": {
+                "ARM64_V8A": 636,
+                "ARMEABI_V7A": 636,
+                "X86_64": 636,
+                "X86": 636
+              },
+              "isExperimental": false,
+              "minSdk": 27,
+              "description": null
+            },
             {
               "version": "1.247.1",
               "versionCodes": {
