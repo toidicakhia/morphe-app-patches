@@ -177,3 +177,4 @@ Every patch bundled in this source, grouped by app. See the [README](README.md) 
 | [Unlock VIP](#unlock-vip) | Forces permanent professional VIP tier, removes ads and upgrade popups, bypasses PairIP. |  |
 
 </details>
+
